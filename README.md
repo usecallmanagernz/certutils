@@ -1,6 +1,6 @@
-# CertUtils
+# Certificate Utilities
 
 Utilities to manage .tlv and .sgn files.
 
-See [http://usecallmanager.nz/itl-file-tlv.html](Device Security) for
+See [Device Security](http://usecallmanager.nz/itl-file-tlv.html) for
 example usage.
