@@ -510,7 +510,7 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
         record_length_index = len(tlv_data)
         tlv_data += struct.pack('> B H H', RECORD_LENGTH, 2, 0)
 
-        if function != 'SAST':
+        if function != 'sast':
             dns_names = certificate.subject.get_attributes_for_oid(oid.NameOID.COMMON_NAME)
 
             if dns_names:
@@ -617,7 +617,7 @@ def main():
     mode = None
     tlv_file = None
     certificate_file = None
-    digest_algorithm = 'SHA1'
+    digest_algorithm = 'sha1'
     filename = None
     record = None
     function = None
@@ -698,7 +698,7 @@ def main():
             filename = os.path.basename(tlv_file)
 
         # Add the signing certificate in the SAST role
-        records.insert(0, (certificate_file, 'SAST'))
+        records.insert(0, (certificate_file, 'sast'))
         build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records)
 
 
