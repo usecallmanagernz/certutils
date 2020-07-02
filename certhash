@@ -1,50 +1,105 @@
-#!/usr/bin/perl
+#!/usr/bin/python3
 #
-# Copyright (c) 2017 Gareth Palmer <gareth.palmer3@gmail.com>
+# Copyright (c) 2020 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-use strict;
-use POSIX qw/EXIT_FAILURE EXIT_SUCCESS/;
-use English qw/-no_match_vars/;
-use IO::File;
-use Crypt::OpenSSL::X509 qw/FORMAT_ASN1 FORMAT_PEM/;
-use Digest;
+import sys
+import os
+import os.path
+import base64
+import getopt
+import traceback
 
-eval {
-    my $certificate_file = shift;
-    die 'No certificate file specified' unless (length $certificate_file);
+import cryptography.hazmat.backends as backends
+import cryptography.x509 as x509
+from cryptography.hazmat.primitives import hashes, serialization
 
-    my ($file, $content);
-    
-    unless ($file = IO::File->new ($certificate_file, '<:raw')) {
-        die 'Unable to read ' . $certificate_file . ': ' . $OS_ERROR;
-    }
 
-    $content = do {local $INPUT_RECORD_SEPARATOR; $file->getline};
-    $file->close;
+class ProgramError(Exception):
+    pass
 
-    my $x509 = Crypt::OpenSSL::X509->new_from_string ($content, FORMAT_PEM);
-    die 'Unable to load record x509 certificate' unless ($x509);
-    
-    my $digest = Digest->new ('SHA-1');
 
-    $digest->add ($x509->as_string (FORMAT_ASN1));
-    $content = $digest->b64digest;
+def certificate_hash(certificate_file, digest_algorithm):
+    try:
+        with open(certificate_file, 'rb') as file:
+            content = file.read()
 
-    # Digest must be padded to a 4 byte length
-    while (length ($content) % 4) {
-        $content .= '=';
-    }
+    except (PermissionError, FileNotFoundError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
 
-    print $content, "\n";
-};
+    try:
+        certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No certificate in: {certificate_file}')
 
-if (length $EVAL_ERROR) {
-    $EVAL_ERROR =~ s/ at \S+ line \d+\.//;
-    warn $EVAL_ERROR;
+    if digest_algorithm == 'sha1':
+        hash = hashes.SHA1()
+    elif digest_algorithm == 'sha256':
+        hash = hashes.SHA256()
+    else:
+        raise ProgramError(f'Unsupported digest algorithm: {digest_algorithm}')
 
-    exit EXIT_FAILURE;
-}
+    digest = hashes.Hash(hash, backends.default_backend())
+    digest.update(certificate.public_bytes(serialization.Encoding.DER))
 
-exit EXIT_SUCCESS;
+    output = digest.finalize()
+
+    print(base64.b64encode(output).decode('utf-8'))
+
+
+def main():
+    short_options = 'hd:'
+    long_options = ['help', 'digest=']
+
+    mode = 'strip'
+    digest_algorithm = 'sha1'
+    certificate_file = None
+
+    try:
+        options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
+
+    except getopt.GetoptError as error:
+        raise ProgramError(error.msg[0].upper() + error.msg[1:])
+
+    for option, argument in options:
+        if option in ('-h', '--help'):
+            mode = 'help'
+
+        elif option in ('-d', '--digest'):
+            if argument not in ('sha1', 'sha256'):
+                raise ProgramError(f'Invalid digest: {argument}')
+
+            digest_algorithm = argument
+
+    if len(arguments):
+        certificate_file = arguments[0]
+
+    if mode == 'help':
+        print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] CERT-FILE\n'
+              'Hash an x509 certificate and output as base64\n'
+              '\n'
+              '  -h, --help                print this help and exit\n'
+              '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha256 (default sha1)\n')
+
+        return
+
+    if certificate_file is None:
+        raise ProgramError('No certificate file specified')
+
+    certificate_hash(certificate_file, digest_algorithm)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+
+    except ProgramError as error:
+        print(str(error), file = sys.stderr)
+        exit(1)
+
+    except Exception:
+        traceback.print_exc(file = sys.stderr)
+        exit(1)
+
+    exit(0)

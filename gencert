@@ -44,7 +44,7 @@ while true; do
         shift 1
 
         if [[ ! $COUNTRY =~ ^[A-Z]{2}$ ]]; then
-            echo "Invalid $OPTION \`$COUNTRY'" >&2
+            echo "Invalid country: $COUNTRY" >&2
             exit 1
         fi
         ;;
@@ -53,7 +53,7 @@ while true; do
         shift 1
 
         if [[ ! $EMAIL_ADDRESS =~ ^[a-zA-Z0-9\+\'\.\-]+@([a-zA-Z0-9]+\.)+[a-zA-Z0-9\-]+$ ]]; then
-            echo "Invalid $OPTION \`$EMAIL_ADDRESS'" >&2
+            echo "Invalid email: $EMAIL_ADDRESS" >&2
             exit 1
         fi
         ;;
@@ -62,7 +62,7 @@ while true; do
         shift 1
 
         if [[ ! $ALTERNATE_NAME =~ ^([a-z0-9\-]+\.)*[a-z0-9\-]+$ ]]; then
-            echo "Invalid $OPTION \`$ALTERNATE_NAME'" >&2
+            echo "Invalid alternate name: $ALTERNATE_NAME" >&2
             exit 1
         fi
 
@@ -73,7 +73,7 @@ while true; do
         shift 1
 
         if [[ ! $BITS =~ ^[0-9]+$ || $BITS -lt 512 || $BITS -gt 4096 ]]; then
-            echo "Invalid $OPTION \`$BITS'" >&2
+            echo "Invalid bits: $BITS" >&2
             exit 1
         fi
         ;;
@@ -82,16 +82,16 @@ while true; do
         shift 1
 
         if [[ ! $YEARS =~ ^[0-9]+$ || $YEARS -lt 1 ]]; then
-            echo "Invalid $OPTION \`$YEARS'" >&2
+            echo "Invalid years: $YEARS" >&2
             exit 1
         fi
         ;;
     -d|--digest)
-        DIGEST="${1,,[a-z]}"
+        DIGEST="$1"
         shift 1
 
         if [[ $DIGEST != +(md5|sha1|sha256|sha512) ]]; then
-            echo "Invaid $OPTION \`$DIGEST'" >&2
+            echo "Invaid digest: $DIGEST" >&2
             exit 1
         fi
         ;;
@@ -115,20 +115,20 @@ while true; do
         echo "Usage: ${0##*/} [OPTIONS]"
         echo "Generate and sign X509 certificates"
         echo ""
-        echo "  -C --common <name>          common name"
-        echo "  -O --organization <name>    organization"
-        echo "  -l --locality <name>        locality"
-        echo "  -s --state <name>           state"
-        echo "  -t --country <code>         country code"
-        echo "  -a --alternate <name>       alternate common name"
-        echo "  -e --email <address>        email address"
-        echo "  -b --bits <size>            RSA key size (default 2048)"
-        echo "  -y --years <number>         number of years to sign the certificate (default 10)"
-        echo "  -d --digest <name>          message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
-        echo "  -o --output                 output file"
-        echo "  -c --cacert                 CA certificate to use for signing"
-        echo "  -n --newca                  generate a CA certificate instead"
-        echo "  -h --help                   print this help and exit"
+        echo "  -C, --common COMMON-NAME           common name"
+        echo "  -O, --organization ORGANIZATION    organization"
+        echo "  -l, --locality LOCALITY            locality"
+        echo "  -s, --state STATE                  state or province"
+        echo "  -t, --country COUNTRY              country code"
+        echo "  -a, --alternate DNS-NAME           alternate DNS name, can be specified more than once"
+        echo "  -e, --email EMAIL                  email address"
+        echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
+        echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
+        echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
+        echo "  -o, --output                       output file"
+        echo "  -c, --cacert                       CA certificate to use for signing"
+        echo "  -n, --newca                        generate a CA certificate instead"
+        echo "  -h, --help                         print this help and exit"
         echo ""
 
         exit 0

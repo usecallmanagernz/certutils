@@ -1,73 +1,118 @@
-#!/usr/bin/perl
-#
-# Copyright (c) 2017 Gareth Palmer <gareth.palmer3@gmail.com>
+#!/usr/bin/python3
+# Copyright (c) 2020 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-use strict;
-use POSIX qw/EXIT_FAILURE EXIT_SUCCESS/;
-use English qw/-no_match_vars/;
-use IO::File qw/SEEK_SET/;
+import sys
+import os
+import os.path
+import struct
+import getopt
+import traceback
 
-eval {
-    my $sgn_file = shift;
-    die 'No .sgn file specified' unless (length $sgn_file);
 
-    (my $content_file = $sgn_file) =~ s/\.sgn$//;
+HEADER_VERSION = 1
+HEADER_LENGTH = 2
 
-    my $input_file;
 
-    unless ($input_file = IO::File->new ($sgn_file, '<:raw')) {
-        die 'Unable to read ' .$sgn_file . ' :' . $OS_ERROR;
-    }
+class ProgramError(Exception):
+    pass
 
-    my $content;
 
-    die 'Unable to read header: ' . $OS_ERROR if ($input_file->read ($content, 10) != 10);
+def strip_sgn(sgn_file):
+    try:
+        with open(sgn_file, 'rb') as file:
+            tlv_data = file.read()
 
-    my ($tag, $length, $index);
+    except (PermissionError, FileNotFoundError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
 
-    $index = 0;
+    tlv_index = 0
 
-    ($tag, $length) = unpack ('CS>', substr ($content, $index, 3));
-    $index += 3;
+    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
 
-    die 'Not a version tag: ' . $tag if ($tag != 1);
-    die 'Wrong version length: ' . $length if ($length != 2);
+    if tag != HEADER_VERSION:
+        raise ProgramError(f'Tag is not HEADER_VERSION: {tag}')
 
-    my $version = join ('.', unpack ('CC', substr ($content, $index, $length)));
-    $index += $length;
+    if length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_VERSION: {length}')
 
-    ($tag, $length) = unpack ('CS>', substr ($content, $index, 3));
-    $index += 3;
+    (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
+    tlv_index += length
 
-    die 'Not a header_length tag: ' . $tag if ($tag != 2);
-    die 'Wrong header_length length: ' . $length if ($length != 2);
+    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
 
-    my $header_length = unpack ('S>', substr ($content, $index, $length));
-    $index += $length;
+    if tag != HEADER_LENGTH:
+        raise ProgramError(f'Tag is not HEADER_LENGTH: {tag}')
 
-    die 'Unable to seek: ' . $OS_ERROR unless ($input_file->seek ($header_length, SEEK_SET));
+    if length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {length}')
 
-    my $output_file;
+    (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+    tlv_index += length
 
-    unless ($output_file = IO::File->new ($content_file, '>:raw')) {
-        die 'Unable to write ' . $content_file . ': ' . $OS_ERROR;
-    }
+    # Remove .sgn suffix
+    output_file = sgn_file[:-4]
 
-    while ($input_file->read ($content, 4096)) {
-        $output_file->write ($content);
-    }
+    try:
+        with open(output_file, 'wb') as file:
+            file.write(tlv_data[header_length:])
 
-    $input_file->close;
-    $output_file->close;
-};
+    except (PermissionError, FileNotFoundError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
 
-if (length $EVAL_ERROR) {
-    $EVAL_ERROR =~ s/ at \S+ line \d+\.//;
-    warn $EVAL_ERROR;
+    print(f'Wrote {output_file}')
 
-    exit EXIT_FAILURE;
-}
 
-exit EXIT_SUCCESS;
+def main():
+    short_options = 'h'
+    long_options = ['help']
+
+    mode = 'strip'
+    sgn_file = None
+
+    try:
+        options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
+
+    except getopt.GetoptError as error:
+        raise ProgramError(error.msg[0].upper() + error.msg[1:])
+
+    for option, argument in options:
+        if option in ('-h', '--help'):
+            mode = 'help'
+
+    if len(arguments):
+        sgn_file = arguments[0]
+
+    if mode == 'help':
+        print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] SGN-FILE\n'
+              'Remove .sgn header from a file\n'
+              '\n'
+              '  -h, --help    print this help and exit\n')
+
+        return
+
+    if sgn_file is None:
+        raise ProgramError('No .sgn file specified')
+
+    if not sgn_file.endswith('.sgn'):
+        raise Interna;Error(f'File {sgn_file} does not end with .sgn')
+
+    strip_sgn(sgn_file)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+
+    except ProgramError as error:
+        print(str(error), file = sys.stderr)
+        exit(1)
+
+    except Exception:
+        traceback.print_exc(file = sys.stderr)
+        exit(1)
+
+    exit(0)
