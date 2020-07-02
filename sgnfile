@@ -321,9 +321,9 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H', HEADER_DIGEST_ALGORITHM, 1)
 
-    if digest_algorithm == 'SHA1':
+    if digest_algorithm == 'sha1':
         tlv_data += struct.pack('B', DIGEST_SHA1)
-    elif digest_algorithm == 'SHA256':
+    elif digest_algorithm == 'sha256':
         tlv_data += struct.pack('B', DIGEST_SHA256)
     else:
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {digest_algorithm}')
@@ -366,9 +366,9 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     except (PermissionError, FileNotFoundError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
-    if digest_algorithm == 'SHA1':
+    if digest_algorithm == 'sha1':
         hash = hashes.SHA1()
-    elif digest_algorithm == 'SHA256':
+    elif digest_algorithm == 'sha256':
         hash = hashes.SHA256()
     else:
         raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {hash}')
