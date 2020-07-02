@@ -52,9 +52,9 @@ def main():
     short_options = 'hd:'
     long_options = ['help', 'digest=']
 
-    mode = 'strip'
     digest_algorithm = 'sha1'
     certificate_file = None
+    help = False
 
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
@@ -63,19 +63,19 @@ def main():
         raise ProgramError(error.msg[0].upper() + error.msg[1:])
 
     for option, argument in options:
-        if option in ('-h', '--help'):
-            mode = 'help'
-
-        elif option in ('-d', '--digest'):
+        if option in ('-d', '--digest'):
             if argument not in ('sha1', 'sha256'):
                 raise ProgramError(f'Invalid digest: {argument}')
 
             digest_algorithm = argument
 
+        elif option in ('-h', '--help'):
+            help = True
+
     if len(arguments):
         certificate_file = arguments[0]
 
-    if mode == 'help':
+    if help:
         print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] CERT-FILE\n'
               'Hash an x509 certificate and output as base64\n'
               '\n'

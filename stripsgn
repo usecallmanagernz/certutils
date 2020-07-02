@@ -70,8 +70,8 @@ def main():
     short_options = 'h'
     long_options = ['help']
 
-    mode = 'strip'
     sgn_file = None
+    help = False
 
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
@@ -81,12 +81,12 @@ def main():
 
     for option, argument in options:
         if option in ('-h', '--help'):
-            mode = 'help'
+            help = True
 
     if len(arguments):
         sgn_file = arguments[0]
 
-    if mode == 'help':
+    if help:
         print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] SGN-FILE\n'
               'Remove .sgn header from a file\n'
               '\n'
