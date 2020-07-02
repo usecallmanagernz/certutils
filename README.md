@@ -1,4 +1,4 @@
-# CertUtils
+# Certificate Utilities
 
 Utilities to manage .tlv and .sgn files.
 
@@ -8,5 +8,5 @@ Utilities to manage .tlv and .sgn files.
 * certhash - hash an x509 certificate and output as base64.
 * gencert - generate and sign X509 certificates.
 
-See [http://usecallmanager.nz/itl-file-tlv.html](Device Security) for
+See [Device Security](http://usecallmanager.nz/itl-file-tlv.html) for
 example usage.
