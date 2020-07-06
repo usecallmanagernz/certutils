@@ -75,7 +75,6 @@ def main():
 
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
-
     except getopt.GetoptError as error:
         raise ProgramError(error.msg[0].upper() + error.msg[1:])
 
