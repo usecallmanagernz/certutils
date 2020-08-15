@@ -24,7 +24,7 @@ def strip_sgn(sgn_file):
         with open(sgn_file, 'rb') as file:
             tlv_data = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     tlv_index = 0
@@ -60,7 +60,7 @@ def strip_sgn(sgn_file):
         with open(output_file, 'wb') as file:
             file.write(tlv_data[header_length:])
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     print(f'Wrote {output_file}')

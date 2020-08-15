@@ -25,7 +25,7 @@ def certificate_hash(certificate_file, digest_algorithm):
         with open(certificate_file, 'rb') as file:
             content = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
@@ -43,9 +43,9 @@ def certificate_hash(certificate_file, digest_algorithm):
     digest = hashes.Hash(hash, backends.default_backend())
     digest.update(certificate.public_bytes(serialization.Encoding.DER))
 
-    output = digest.finalize()
+    certificate_hash = base64.b64encode(digest.finalize()).decode('utf-8')
 
-    print(base64.b64encode(output).decode('utf-8'))
+    print(certificate_hash)
 
 
 def main():

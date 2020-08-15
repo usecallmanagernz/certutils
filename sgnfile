@@ -52,7 +52,7 @@ def parse_sgn(tlv_file, certificate_file):
         with open(tlv_file, 'rb') as file:
             tlv_data = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     tlv_index = 0
@@ -162,8 +162,6 @@ def parse_sgn(tlv_file, certificate_file):
             (signature_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
-            continue
-
         elif tag == HEADER_SIGNATURE_MODULUS:
             if length != 1:
                raise ProgramError('Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
@@ -207,6 +205,9 @@ def parse_sgn(tlv_file, certificate_file):
     if header_digest_algorithm is None:
         raise ProgramError(f'Missing HEADER_DIGEST_ALGORITHM')
 
+    if header_digest_algorithm not in (DIGEST_SHA1, DIGEST_SHA256):
+        raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
+
     if header_signature_index is None:
         raise ProgramError(f'Missing HEADER_SIGNATURE')
 
@@ -218,7 +219,7 @@ def parse_sgn(tlv_file, certificate_file):
         with open(certificate_file, 'rb') as file:
             content = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
@@ -232,8 +233,6 @@ def parse_sgn(tlv_file, certificate_file):
         hash = hashes.SHA1()
     elif header_digest_algorithm == DIGEST_SHA256:
         hash = hashes.SHA256()
-    else:
-        raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     signature = tlv_data[header_signature_index + 3:header_signature_index + 3 + header_signature_length]
     content = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
@@ -263,7 +262,7 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
         with open(certificate_file, 'rb') as file:
             content = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
@@ -363,7 +362,7 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
         with open(input_file, 'rb') as file:
             tlv_data += file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     if digest_algorithm == 'sha1':
@@ -387,7 +386,7 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
         with open(sgn_file, 'wb') as file:
             file.write(content)
 
-    except PermissionError as error:
+    except (PermissionError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     print(f'Built {sgn_file}')

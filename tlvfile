@@ -72,7 +72,7 @@ def parse_tlv(tlv_file):
         with open(tlv_file, 'rb') as file:
             tlv_data = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     tlv_index = 0
@@ -183,8 +183,6 @@ def parse_tlv(tlv_file):
             (signature_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
-            continue
-
         elif tag == HEADER_SIGNATURE_MODULUS:
             if length != 1:
                raise ProgramError('Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
@@ -230,6 +228,9 @@ def parse_tlv(tlv_file):
 
     if header_digest_algorithm is None:
         raise ProgramError(f'Missing HEADER_DIGEST_ALGORITHM')
+
+    if header_digest_algorithm not in (DIGEST_SHA1, DIGEST_SHA256):
+        raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     if header_signature_index is None:
         raise ProgramError(f'Missing HEADER_SIGNATURE')
@@ -335,11 +336,22 @@ def parse_tlv(tlv_file):
 
                 print(f'Certificate:      {length} bytes')
 
+                if header_digest_algorithm == DIGEST_SHA1:
+                    hash = hashes.SHA1()
+                elif header_digest_algorithm == DIGEST_SHA256:
+                    hash = hashes.SHA256()
+
+                digest = hashes.Hash(hash, backends.default_backend())
+                digest.update(certificate)
+
+                certificate_hash = binascii.hexlify(digest.finalize()).decode('utf-8')
+
+                print(f'Certificate Hash: {certificate_hash}')
+
                 record_certificate = certificate
 
             elif tag in (RECORD_IP_ADDRESS, RECORD_CERTIFICATE_HASH, RECORD_HASH_ALGORITHM):
                 tlv_index += length
-                continue
 
             else:
                 raise ProgramError(f'Unknown RECORD tag: {tag}')
@@ -359,8 +371,6 @@ def parse_tlv(tlv_file):
         hash = hashes.SHA1()
     elif header_digest_algorithm == DIGEST_SHA256:
         hash = hashes.SHA256()
-    else:
-        raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     signature = tlv_data[header_signature_index + 3:header_signature_index + 3 + header_signature_length]
     content = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
@@ -397,7 +407,7 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
         with open(certificate_file, 'rb') as file:
             content = file.read()
 
-    except (PermissionError, FileNotFoundError) as error:
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
@@ -499,7 +509,7 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
             with open(certificate_file, 'rb') as file:
                 content = file.read()
 
-        except (PermissionError, FileNotFoundError) as error:
+        except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
             raise ProgramError(f'{error.strerror}: {error.filename}')
 
         try:
@@ -604,7 +614,7 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
         with open(tlv_file, 'wb') as file:
             file.write(content)
 
-    except PermissionError as error:
+    except (PermissionError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     print(f'Built {tlv_file}')
