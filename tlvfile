@@ -19,7 +19,9 @@ import cryptography.x509 as x509
 import cryptography.x509.oid as oid
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-from asn1crypto.core import Sequence, Integer
+import cryptography.hazmat.primitives.asymmetric.rsa as rsa
+import cryptography.hazmat.primitives.asymmetric.ec as ec
+import asn1crypto.core as asn1
 
 
 HEADER_VERSION = 1
@@ -37,6 +39,7 @@ HEADER_SIGNATURE = 12
 HEADER_PADDING = 13
 HEADER_FILENAME = 14
 HEADER_TIMESTAMP = 15
+HEADER_SIGNER_VERSION = 28
 
 RECORD_LENGTH = 1
 RECORD_DNS_NAME = 2
@@ -60,7 +63,9 @@ FUNCTION_SAST = 0
 FUNCTION_CCM = 1
 FUNCTION_CCM_TFTP = 2
 FUNCTION_TFTP = 3
+FUNCTION_CAPF = 4
 FUNCTION_HTTPS = 7
+FUNCTION_TVS = 21
 
 
 class ProgramError(Exception):
@@ -123,7 +128,16 @@ def parse_tlv(tlv_file):
         (length,) = struct.unpack_from('> H', tlv_data, tlv_index)
         tlv_index += 2
 
-        if tag == HEADER_SIGNER_ID:
+        if tag == HEADER_SIGNER_VERSION:
+            if length != 2:
+                raise ProgramError(f'Unsupported length for HEADER_SIGNER_VERSION: {length}')
+
+            (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
+            tlv_index += length
+
+            print(f'Signer Version:   {major}.{minor}')
+
+        elif tag == HEADER_SIGNER_ID:
             continue
 
         elif tag == HEADER_SIGNER_NAME:
@@ -157,7 +171,7 @@ def parse_tlv(tlv_file):
 
         elif tag == HEADER_DIGEST_ALGORITHM:
             if length != 1:
-                raise ProgramError('Unsupported length for HEADER_DIGEST_ALGORITHM: {length}')
+                raise ProgramError(f'Unsupported length for HEADER_DIGEST_ALGORITHM: {length}')
 
             (digest_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
@@ -166,8 +180,8 @@ def parse_tlv(tlv_file):
 
             if digest_algorithm == DIGEST_SHA1:
                 print('SHA1')
-            elif digest_algorithm == DIGEST_SHA256:
-                print('SHA256')
+            elif digest_algorithm == DIGEST_SHA512:
+                print('SHA512')
             else:
                 print(f'{digest_algorithm}')
 
@@ -178,14 +192,14 @@ def parse_tlv(tlv_file):
 
         elif tag == HEADER_SIGNATURE_ALGORITHM:
             if length != 1:
-                raise ProgramError('Unsupported length for HEADER_SIGNATURE_ALGORITHM: {length}')
+                raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_ALGORITHM: {length}')
 
             (signature_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
         elif tag == HEADER_SIGNATURE_MODULUS:
             if length != 1:
-               raise ProgramError('Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
+               raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
 
             (signature_modulus,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
@@ -229,7 +243,7 @@ def parse_tlv(tlv_file):
     if header_digest_algorithm is None:
         raise ProgramError(f'Missing HEADER_DIGEST_ALGORITHM')
 
-    if header_digest_algorithm not in (DIGEST_SHA1, DIGEST_SHA256):
+    if header_digest_algorithm not in (DIGEST_SHA1, DIGEST_SHA512):
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     if header_signature_index is None:
@@ -242,7 +256,7 @@ def parse_tlv(tlv_file):
         tlv_index += 3
 
         if tag != RECORD_LENGTH:
-            raise ProgramError('Tag is not RECORD_LENGTH: {tag}')
+            raise ProgramError(f'Tag is not RECORD_LENGTH: {tag}')
 
         if length != 2:
             raise ProgramError(f'Unsupported length for RECORD_LENGTH: {length}')
@@ -278,7 +292,7 @@ def parse_tlv(tlv_file):
 
             elif tag == RECORD_FUNCTION:
                 if length != 2:
-                    raise ProgramError('Unsupported length for RECORD_FUNCTION: {length}')
+                    raise ProgramError(f'Unsupported length for RECORD_FUNCTION: {length}')
 
                 (function,) = struct.unpack_from('> H', tlv_data, tlv_index)
                 tlv_index += length
@@ -338,8 +352,8 @@ def parse_tlv(tlv_file):
 
                 if header_digest_algorithm == DIGEST_SHA1:
                     hash = hashes.SHA1()
-                elif header_digest_algorithm == DIGEST_SHA256:
-                    hash = hashes.SHA256()
+                elif header_digest_algorithm == DIGEST_SHA512:
+                    hash = hashes.SHA512()
 
                 digest = hashes.Hash(hash, backends.default_backend())
                 digest.update(certificate)
@@ -369,8 +383,8 @@ def parse_tlv(tlv_file):
 
     if header_digest_algorithm == DIGEST_SHA1:
         hash = hashes.SHA1()
-    elif header_digest_algorithm == DIGEST_SHA256:
-        hash = hashes.SHA256()
+    elif header_digest_algorithm == DIGEST_SHA512:
+        hash = hashes.SHA512()
 
     signature = tlv_data[header_signature_index + 3:header_signature_index + 3 + header_signature_length]
     content = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
@@ -385,10 +399,10 @@ def parse_tlv(tlv_file):
     print('Valid signature')
 
 
-class RSAPublicKey(Sequence):
+class RSAPublicNumbers(asn1.Sequence):
     _fields = [
-        ('modulus', Integer),
-        ('exponent', Integer)
+        ('n', asn1.Integer),
+        ('e', asn1.Integer)
     ]
 
 
@@ -402,7 +416,7 @@ oid_names = {
 }
 
 
-def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
+def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, records):
     try:
         with open(certificate_file, 'rb') as file:
             content = file.read()
@@ -413,12 +427,12 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
     try:
         certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {certificate_file}')
 
     try:
         private_key = serialization.load_pem_private_key(content, None, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No private key in: {certificate_file}')
+        raise ProgramError(f'No private key in file: {certificate_file}')
 
     header_signature_length = private_key.key_size // 8
 
@@ -427,6 +441,9 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
 
     header_length_index = len(tlv_data)
     tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
+
+    (major, minor) = version.split('.')
+    tlv_data += struct.pack('> B H B B', HEADER_SIGNER_VERSION, 2, int(major), int(minor))
 
     signer_name = ''
 
@@ -467,8 +484,8 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
 
     if digest_algorithm == 'sha1':
         tlv_data += struct.pack('B', DIGEST_SHA1)
-    elif digest_algorithm == 'sha256':
-        tlv_data += struct.pack('B', DIGEST_SHA256)
+    elif digest_algorithm == 'sha512':
+        tlv_data += struct.pack('B', DIGEST_SHA512)
     else:
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {digest_algorithm}')
 
@@ -515,7 +532,7 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
         try:
             certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
         except ValueError:
-            raise ProgramError(f'No certificate in: {certificate_file}')
+            raise ProgramError(f'No certificate in file: {certificate_file}')
 
         record_length_index = len(tlv_data)
         tlv_data += struct.pack('> B H H', RECORD_LENGTH, 2, 0)
@@ -576,8 +593,16 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
         tlv_data += struct.pack('> B H', RECORD_SERIAL_NUMBER, len(serial_number))
         tlv_data += serial_number
 
-        public_numbers = certificate.public_key().public_numbers()
-        public_key = RSAPublicKey({'modulus': public_numbers.n, 'exponent': public_numbers.e}).dump()
+        public_key = certificate.public_key()
+        public_numbers = public_key.public_numbers()
+
+        if isinstance(public_key, rsa.RSAPublicKey):
+            public_key = RSAPublicNumbers({'n': public_numbers.n, 'e': public_numbers.e}).dump()
+        elif isinstance(public_key, ec.EllipticCurvePublicKey):
+            # Obsolete API in cryptography>=2.5. Use public_bytes with X962+UncompressedPoint instead
+            public_key = public_numbers.encode_point()
+        else:
+            raise ProgramError('Unsupported certificate PUBLIC_KEY type')
 
         tlv_data += struct.pack('> B H', RECORD_PUBLIC_KEY, len(public_key))
         tlv_data += public_key
@@ -597,8 +622,8 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
 
     if digest_algorithm == 'sha1':
         hash = hashes.SHA1()
-    elif digest_algorithm == 'sha256':
-        hash = hashes.SHA256()
+    elif digest_algorithm == 'sha512':
+        hash = hashes.SHA512()
     else:
         raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {hash}')
 
@@ -621,12 +646,13 @@ def build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records):
 
 
 def main():
-    short_options = 'pbhc:d:F:r:f:'
-    long_options = ['parse', 'build', 'help', 'certificate=', 'digest=', 'filename=', 'record=', 'function=']
+    short_options = 'pbhc:v:d:F:r:f:'
+    long_options = ['parse', 'build', 'help', 'certificate=', 'version=', 'digest=', 'filename=', 'record=', 'function=']
 
     mode = None
     tlv_file = None
     certificate_file = None
+    version = '1.0'
     digest_algorithm = 'sha1'
     filename = None
     record = None
@@ -641,15 +667,24 @@ def main():
     for option, argument in options:
         if option in ('-p', '--parse'):
             mode = 'parse'
+
         elif option in ('-b', '--build'):
             mode = 'build'
+
         elif option in ('-h', '--help'):
             mode = 'help'
 
         elif option in ('-c', '--certificate'):
             certificate_file = argument
+
+        elif option in ('-v', '--version'):
+            if argument not in ('1.0', '1.1'):
+                raise ProgramError(f'Invalid version: {argument}')
+
+            version = argument
+
         elif option in ('-d', '--digest'):
-            if argument not in ('sha1', 'sha256'):
+            if argument not in ('sha1', 'sha512'):
                 raise ProgramError(f'Invalid digest: {argument}')
 
             digest_algorithm = argument
@@ -659,6 +694,7 @@ def main():
 
         elif option in ('-r', '--record'):
             record = argument
+
         elif option in ('-f', '--function'):
             if argument not in ('sast', 'ccm', 'tftp', 'ccm+tftp', 'https'):
                 raise ProgramError(f'Invalid function: {argument}')
@@ -683,7 +719,8 @@ def main():
               '  -b, --build                    build new .tlv file using options below\n'
               '  -h, --help                     print this help and exit\n'
               '  -c, --certificate CERT-FILE    header signing certificate, also included as the first sast record\n'
-              '  -d, --digest ALGOIRTHM         digest algorithm for signature: sha1 or sha256 (default sha1)\n'
+              '  -v, --version VERSION          header signer version 1.0 or 1.1 (default 1.0)\n'
+              '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
               '  -F, --filename NAME            file name to store in .tlv header\n'
               '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'
               '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp or https\n')
@@ -708,7 +745,7 @@ def main():
 
         # Add the signing certificate in the SAST role
         records.insert(0, (certificate_file, 'sast'))
-        build_tlv(tlv_file, certificate_file, digest_algorithm, filename, records)
+        build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, records)
 
 
 if __name__ == '__main__':

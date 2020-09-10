@@ -90,7 +90,7 @@ while true; do
         DIGEST="$1"
         shift 1
 
-        if [[ $DIGEST != +(md5|sha1|sha256|sha512) ]]; then
+        if [[ $DIGEST != +(md5|sha1|sha256|sha384|sha512) ]]; then
             echo "Invaid digest: $DIGEST" >&2
             exit 1
         fi
@@ -124,7 +124,7 @@ while true; do
         echo "  -e, --email EMAIL                  email address"
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
-        echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
+        echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256, sha384 or sha512 (default sha256)"
         echo "  -o, --output                       output file"
         echo "  -c, --cacert                       CA certificate to use for signing"
         echo "  -n, --newca                        generate a CA certificate instead"

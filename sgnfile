@@ -145,8 +145,8 @@ def parse_sgn(tlv_file, certificate_file):
 
             if digest_algorithm == DIGEST_SHA1:
                 print('SHA1')
-            elif digest_algorithm == DIGEST_SHA256:
-                print('SHA256')
+            elif digest_algorithm == DIGEST_SHA512:
+                print('SHA512')
             else:
                 print(f'{digest_algorithm}')
 
@@ -205,7 +205,7 @@ def parse_sgn(tlv_file, certificate_file):
     if header_digest_algorithm is None:
         raise ProgramError(f'Missing HEADER_DIGEST_ALGORITHM')
 
-    if header_digest_algorithm not in (DIGEST_SHA1, DIGEST_SHA256):
+    if header_digest_algorithm not in (DIGEST_SHA1, DIGEST_SHA512):
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     if header_signature_index is None:
@@ -225,14 +225,14 @@ def parse_sgn(tlv_file, certificate_file):
     try:
         certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {certificate_file}')
 
     public_key = certificate.public_key()
 
     if header_digest_algorithm == DIGEST_SHA1:
         hash = hashes.SHA1()
-    elif header_digest_algorithm == DIGEST_SHA256:
-        hash = hashes.SHA256()
+    elif header_digest_algorithm == DIGEST_SHA512:
+        hash = hashes.SHA512()
 
     signature = tlv_data[header_signature_index + 3:header_signature_index + 3 + header_signature_length]
     content = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
@@ -268,17 +268,17 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     try:
         certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {certificate_file}')
 
     try:
         private_key = serialization.load_pem_private_key(content, None, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No private key in: {certificate_file}')
+        raise ProgramError(f'No private key in file: {certificate_file}')
 
     header_signature_length = private_key.key_size // 8
 
     tlv_data = bytearray()
-    tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 1, 2)
+    tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 2, 0)
 
     header_length_index = len(tlv_data)
     tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
@@ -322,8 +322,8 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
     if digest_algorithm == 'sha1':
         tlv_data += struct.pack('B', DIGEST_SHA1)
-    elif digest_algorithm == 'sha256':
-        tlv_data += struct.pack('B', DIGEST_SHA256)
+    elif digest_algorithm == 'sha512':
+        tlv_data += struct.pack('B', DIGEST_SHA512)
     else:
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {digest_algorithm}')
 
@@ -367,8 +367,8 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
     if digest_algorithm == 'sha1':
         hash = hashes.SHA1()
-    elif digest_algorithm == 'sha256':
-        hash = hashes.SHA256()
+    elif digest_algorithm == 'sha512':
+        hash = hashes.SHA512()
     else:
         raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {hash}')
 
@@ -410,15 +410,18 @@ def main():
     for option, argument in options:
         if option in ('-p', '--parse'):
             mode = 'parse'
+
         elif option in ('-b', '--build'):
             mode = 'build'
+
         elif option in ('-h', '--help'):
             mode = 'help'
 
         elif option in ('-c', '--certificate'):
             certificate_file = argument
+
         elif option in ('-d', '--digest'):
-            if argument not in ('sha1', 'sha256'):
+            if argument not in ('sha1', 'sha512'):
                 raise ProgramError(f'Invalid digest: {argument}')
 
             digest_algorithm = argument
@@ -440,7 +443,7 @@ def main():
               '  -b, --build                    build new .sgn file using options below\n'
               '  -h, --help                     print this help and exit\n'
               '  -c, --certificate CERT-FILE    header signing certificate\n'
-              '  -d, --digest ALGOIRTHM         digest algorithm for signature: sha1 or sha256 (default sha1)\n'
+              '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
               '  -F, --filename NAME            file name to store in .sgn header\n')
 
         return

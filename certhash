@@ -31,12 +31,12 @@ def certificate_hash(certificate_file, digest_algorithm):
     try:
         certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {certificate_file}')
 
     if digest_algorithm == 'sha1':
         hash = hashes.SHA1()
-    elif digest_algorithm == 'sha256':
-        hash = hashes.SHA256()
+    elif digest_algorithm == 'sha512':
+        hash = hashes.SHA512()
     else:
         raise ProgramError(f'Unsupported digest algorithm: {digest_algorithm}')
 
@@ -63,7 +63,7 @@ def main():
 
     for option, argument in options:
         if option in ('-d', '--digest'):
-            if argument not in ('sha1', 'sha256'):
+            if argument not in ('sha1', 'sha512'):
                 raise ProgramError(f'Invalid digest: {argument}')
 
             digest_algorithm = argument
@@ -79,7 +79,7 @@ def main():
               'Hash an x509 certificate and output as base64\n'
               '\n'
               '  -h, --help                print this help and exit\n'
-              '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha256 (default sha1)\n')
+              '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha512 (default sha1)\n')
 
         return
 
