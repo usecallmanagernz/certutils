@@ -307,8 +307,12 @@ def parse_tlv(tlv_file):
                     print('CCM+TFTP')
                 elif function == FUNCTION_TFTP:
                     print('TFTP')
+                elif function == FUNCTION_CAPF:
+                    print('CAPF')
                 elif function == FUNCTION_HTTPS:
                     print('HTTPS')
+                elif function == FUNCTION_TVS:
+                    print('TVS')
                 else:
                     print(f'{function}')
 
@@ -571,8 +575,12 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
             tlv_data += struct.pack('> H', FUNCTION_CCM_TFTP)
         elif function == 'tftp':
             tlv_data += struct.pack('> H', FUNCTION_TFTP)
+        elif function == 'capf':
+            tlv_data += struct.pack('> H', FUNCTION_CAPF)
         elif function == 'https':
             tlv_data += struct.pack('> H', FUNCTION_HTTPS)
+        elif function == 'tvs':
+            tlv_data += struct.pack('> H', FUNCTION_TVS)
         else:
             raise ProgramError(f'Unsupported RECORD_FUNCTION: {function}')
 
@@ -696,7 +704,7 @@ def main():
             record = argument
 
         elif option in ('-f', '--function'):
-            if argument not in ('sast', 'ccm', 'tftp', 'ccm+tftp', 'https'):
+            if argument not in ('sast', 'ccm', 'tftp', 'ccm+tftp', 'https', 'tvs', 'capf'):
                 raise ProgramError(f'Invalid function: {argument}')
 
             if record is None:
@@ -723,7 +731,7 @@ def main():
               '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
               '  -F, --filename NAME            file name to store in .tlv header\n'
               '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'
-              '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp or https\n')
+              '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp, https, tvs or capf\n')
 
         return
 
