@@ -81,7 +81,7 @@ while true; do
             exit 1
         fi
 
-        ALTERNATE_NAMES+=($1)
+        ALTERNATE_NAMES+=("$1")
         ;;
     -b|--bits)
         BITS="$1"
@@ -143,11 +143,11 @@ while true; do
         echo "  -e, --email EMAIL                  email address"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
-        echo "  -E, --curve CURVE                  generate a elliptic curve key instead of RSA"
+        echo "  -E, --curve CURVE                  generate an EC key instead of an RSA key"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256, sha384 or sha512 (default sha256)"
         echo "  -o, --output                       output file"
         echo "  -c, --cacert                       CA certificate to use for signing"
-        echo "  -n, --newca                        generate a CA certificate instead"
+        echo "  -n, --newca                        generate a CA certificate to use for signing"
         echo "  -h, --help                         print this help and exit"
         echo ""
 
@@ -175,8 +175,7 @@ END_DATE=$(date -u -d "now + $YEARS years" +"%Y%m%d000000Z")
 TEMP_DIR=$(mktemp -d /tmp/gencert-XXXXXXXX) || exit 1
 
 trap "rm -rf $TEMP_DIR" EXIT
-touch "$TEMP_DIR/random" "$TEMP_DIR/database.txt"
-touch "$TEMP_DIR/database.txt.attr"
+touch "$TEMP_DIR/random" "$TEMP_DIR/database.txt" "$TEMP_DIR/database.txt.attr"
 
 SERIAL_NUMBER=$(hexdump -n 16 -v -e "1/1 \"%02X\"" /dev/urandom)
 echo "$SERIAL_NUMBER" > "$TEMP_DIR/serial.txt"
@@ -260,6 +259,11 @@ for (( INDEX=0; INDEX < ${#ALTERNATE_NAMES[@]}; INDEX++ )); do
 done
 
 if [[ -n $CURVE ]]; then
+    if ! openssl ecparam -name "$CURVE" -noout 2> /dev/null; then
+        echo "Invalid curve: $CURVE"
+        exit 1
+    fi
+
     if ! openssl ecparam -name "$CURVE" -genkey -noout \
          -out "$TEMP_DIR/key.pem" 2> /dev/null; then
         echo "Error while generaing EC key"

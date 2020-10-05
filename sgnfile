@@ -278,7 +278,7 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     header_signature_length = private_key.key_size // 8
 
     tlv_data = bytearray()
-    tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 2, 0)
+    tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 1, 0)
 
     header_length_index = len(tlv_data)
     tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
@@ -462,7 +462,7 @@ def main():
             raise ProgramError('No .pem file specified for -c/--certificate')
 
         if filename is None:
-            filename = os.path.basename(input_file)
+            filename = os.path.basename(input_file) + '.sgn'
 
         build_sgn(input_file, certificate_file, digest_algorithm, filename)
 

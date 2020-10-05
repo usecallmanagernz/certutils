@@ -541,17 +541,6 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
         record_length_index = len(tlv_data)
         tlv_data += struct.pack('> B H H', RECORD_LENGTH, 2, 0)
 
-        if function != 'sast':
-            dns_names = certificate.subject.get_attributes_for_oid(oid.NameOID.COMMON_NAME)
-
-            if dns_names:
-                dns_name = dns_names[0].value.encode('utf-8') + b'\x00'
-            else:
-                dns_name = ''.encode('utf-8')
-
-            tlv_data += struct.pack('> B H', RECORD_DNS_NAME, len(dns_name))
-            tlv_data += dns_name
-
         subject_name = ''
 
         for attribute in certificate.subject:
