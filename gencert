@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Copyright (c) 2017 Gareth Palmer <gareth.palmer3@gmail.com>
+# Copyright (c) 2017-2020 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-OPTIONS=$(getopt -n ${0##*/} -o "C:O:l:s:t:e:a:b:E:y:d:o:c:nh" \
-    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,cacert:,newca,help" -- "$@")
+OPTIONS=$(getopt -n ${0##*/} -o "C:O:l:s:t:e:a:b:E:y:d:o:c:rih" \
+    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,cacert:,rootca,intermediateca,help" -- "$@")
 
 if [[ $? -ne 0 ]]; then
     echo "Try \`${0##*/} --help' for more information"
@@ -29,7 +29,8 @@ DIGEST="sha256"
 
 CA_CERTIFICATE=""
 OUTPUT_FILE=""
-NEW_CA=false
+ROOT_CA=false
+INTERMEDIATE_CA=false
 
 while true; do
     OPTION="$1"
@@ -127,8 +128,11 @@ while true; do
             exit 1
         fi
         ;;
-    -n|--newca)
-        NEW_CA=true
+    -r|--root)
+        ROOT_CA=true
+        ;;
+    -i|--intermediate)
+        INTERMEDIATE_CA=true
         ;;
     -h|--help)
         echo "Usage: ${0##*/} [OPTIONS]"
@@ -147,7 +151,8 @@ while true; do
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256, sha384 or sha512 (default sha256)"
         echo "  -o, --output                       output file"
         echo "  -c, --cacert                       CA certificate to use for signing"
-        echo "  -n, --newca                        generate a CA certificate to use for signing"
+        echo "  -r, --root                         generate a Root CA certificate to use for signing"
+        echo "  -i, --intermediate                 generate an Intermediate CA certificate to use for signing"
         echo "  -h, --help                         print this help and exit"
         echo ""
 
@@ -195,7 +200,7 @@ default_enddate = $END_DATE
 default_md = $DIGEST
 EOF
 
-if $NEW_CA; then
+if $ROOT_CA; then
     cat >> "$TEMP_DIR/openssl.cnf" <<EOF
 certificate = $TEMP_DIR/crt.pem
 private_key = $TEMP_DIR/key.pem
@@ -217,10 +222,23 @@ preserve = no
 unique_subject = no
 
 [ca_extensions]
+EOF
+
+if $INTERMEDIATE_CA; then
+    cat >> "$TEMP_DIR/openssl.cnf" <<EOF
+basicConstraints = CA:true, pathlen:0
+keyUsage = Certificate Sign, CRL Sign
+EOF
+else
+    cat >> "$TEMP_DIR/openssl.cnf" <<EOF
 basicConstraints = CA:false
-subjectKeyIdentifier = hash
 keyUsage = Digital Signature, Key Encipherment, Data Encipherment
 extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication
+EOF
+fi
+
+cat >> "$TEMP_DIR/openssl.cnf" <<EOF
+subjectKeyIdentifier = hash
 ${ALTERNATE_NAMES[@]:+subjectAltName = @alternate_names}
 
 [policy_default]
@@ -239,8 +257,8 @@ prompt = no
 
 [req_extensions]
 basicConstraints = CA:true
-subjectKeyIdentifier = hash
 keyUsage = Certificate Sign, CRL Sign
+subjectKeyIdentifier = hash
 ${ALTERNATE_NAMES[@]:+subjectAltName = @alternate_names}
 
 [distinguished_name]
@@ -282,7 +300,7 @@ if ! openssl req -config "$TEMP_DIR/openssl.cnf" -new -batch \
     exit 1
 fi
 
-if $NEW_CA; then
+if $ROOT_CA; then
     if ! openssl ca -config "$TEMP_DIR/openssl.cnf" -notext -selfsign -batch \
          -in "$TEMP_DIR/req.pem" -out "$TEMP_DIR/crt.pem" 2> /dev/null; then
         echo "Error while signing CA certificate"
