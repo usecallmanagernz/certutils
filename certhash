@@ -49,8 +49,8 @@ def certificate_hash(certificate_file, digest_algorithm):
 
 
 def main():
-    short_options = 'hd:'
-    long_options = ['help', 'digest=']
+    short_options = 'd:H'
+    long_options = ['digest=', 'help']
 
     digest_algorithm = 'sha1'
     certificate_file = None
@@ -59,7 +59,8 @@ def main():
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
     except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:])
+        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
     for option, argument in options:
         if option in ('-d', '--digest'):
@@ -68,20 +69,20 @@ def main():
 
             digest_algorithm = argument
 
-        elif option in ('-h', '--help'):
+        elif option in ('-H', '--help'):
             help = True
-
-    if len(arguments):
-        certificate_file = arguments[0]
 
     if help:
         print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] CERT-FILE\n'
               'Hash an x509 certificate and output as base64\n'
               '\n'
-              '  -h, --help                print this help and exit\n'
-              '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha512 (default sha1)\n')
+              '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha512 (default sha1)\n'
+              '  -H, --help                print this help and exit\n')
 
         return
+
+    if len(arguments):
+        certificate_file = arguments[0]
 
     if certificate_file is None:
         raise ProgramError('No certificate file specified')

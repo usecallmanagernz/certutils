@@ -247,7 +247,7 @@ def parse_tlv(tlv_file):
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     if header_signature_index is None:
-        raise ProgramError(f'Missing HEADER_SIGNATURE')
+        raise ProgramError('Missing HEADER_SIGNATURE')
 
     while tlv_index < len(tlv_data):
         record_index = tlv_index
@@ -354,15 +354,26 @@ def parse_tlv(tlv_file):
 
                 print(f'Certificate:      {length} bytes')
 
+                try:
+                    certificate = x509.load_der_x509_certificate(certificate, backends.default_backend())
+                except ValueError:
+                    raise ProgramError('Invalid certificate')
+
+                public_key = certificate.public_key()
+
+                if isinstance(public_key, rsa.RSAPublicKey):
+                    print('Key Algorithm:    RSA')
+                elif isinstance(public_key, ec.EllipticCurvePublicKey):
+                    print('Key Algorithm:    EllipticCurve')
+                else:
+                    raise ProgramError('Unsupported RECORD_CERTIFICATE type')
+
                 if header_digest_algorithm == DIGEST_SHA1:
                     hash = hashes.SHA1()
                 elif header_digest_algorithm == DIGEST_SHA512:
                     hash = hashes.SHA512()
 
-                digest = hashes.Hash(hash, backends.default_backend())
-                digest.update(certificate)
-
-                certificate_hash = binascii.hexlify(digest.finalize()).decode('utf-8')
+                certificate_hash = binascii.hexlify(certificate.fingerprint(hash)).decode('utf-8')
 
                 print(f'Certificate Hash: {certificate_hash}')
 
@@ -382,8 +393,7 @@ def parse_tlv(tlv_file):
     if header_certificate is None:
         raise ProgramError('Missing RECORD with FUNCTION_SAST')
 
-    certificate = x509.load_der_x509_certificate(header_certificate, backends.default_backend())
-    public_key = certificate.public_key()
+    public_key = header_certificate.public_key()
 
     if header_digest_algorithm == DIGEST_SHA1:
         hash = hashes.SHA1()
@@ -591,13 +601,12 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
         tlv_data += serial_number
 
         public_key = certificate.public_key()
-        public_numbers = public_key.public_numbers()
 
         if isinstance(public_key, rsa.RSAPublicKey):
+            public_numbers = public_key.public_numbers()
             public_key = RSAPublicNumbers({'n': public_numbers.n, 'e': public_numbers.e}).dump()
         elif isinstance(public_key, ec.EllipticCurvePublicKey):
-            # Obsolete API in cryptography>=2.5. Use public_bytes with X962+UncompressedPoint instead
-            public_key = public_numbers.encode_point()
+            public_key = public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
         else:
             raise ProgramError('Unsupported certificate PUBLIC_KEY type')
 
@@ -643,8 +652,8 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
 
 
 def main():
-    short_options = 'pbhc:v:d:F:r:f:'
-    long_options = ['parse', 'build', 'help', 'certificate=', 'version=', 'digest=', 'filename=', 'record=', 'function=']
+    short_options = 'pbc:v:d:F:r:f:H'
+    long_options = ['parse', 'build', 'certificate=', 'version=', 'digest=', 'filename=', 'record=', 'function=', 'help']
 
     mode = None
     tlv_file = None
@@ -655,11 +664,13 @@ def main():
     record = None
     function = None
     records = []
+    help = False
 
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
     except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:])
+        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
     for option, argument in options:
         if option in ('-p', '--parse'):
@@ -667,9 +678,6 @@ def main():
 
         elif option in ('-b', '--build'):
             mode = 'build'
-
-        elif option in ('-h', '--help'):
-            mode = 'help'
 
         elif option in ('-c', '--certificate'):
             certificate_file = argument
@@ -702,27 +710,30 @@ def main():
             function = argument
             records.append((record, function))
 
-    if len(arguments):
-        tlv_file = arguments[0]
+        elif option in ('-H', '--help'):
+            help = True
 
-    if mode is None:
-        raise ProgramError('Either -p/--parse, -b/--build or -h/--help must be specified')
-
-    if mode == 'help':
+    if help:
         print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] TLV-FILE\n'
               'Parse or build .tlv files\n'
               '\n'
               '  -p, --parse                    parse the specified .tlv file\n'
               '  -b, --build                    build new .tlv file using options below\n'
-              '  -h, --help                     print this help and exit\n'
               '  -c, --certificate CERT-FILE    header signing certificate, also included as the first sast record\n'
               '  -v, --version VERSION          header signer version 1.0 or 1.1 (default 1.0)\n'
               '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
               '  -F, --filename NAME            file name to store in .tlv header\n'
               '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'
-              '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp, https, tvs or capf\n')
+              '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp, https, tvs or capf\n'
+              '  -H, --help                     print this help and exit\n')
 
         return
+
+    if mode is None:
+        raise ProgramError('No mode specified (either parse or build). Try --help')
+
+    if len(arguments):
+        tlv_file = arguments[0]
 
     if tlv_file is None:
         raise ProgramError('No .tlv file specified')
@@ -732,10 +743,10 @@ def main():
 
     elif mode == 'build':
         if certificate_file is None:
-            raise ProgramError('No .pem file specified for -c/--certificate')
+            raise ProgramError('No certificate .pem file specified')
 
         if not len(records):
-            raise ProgramError('No -r/--record certificates specified')
+            raise ProgramError('No record certificates specified')
 
         if filename is None:
             filename = os.path.basename(tlv_file)

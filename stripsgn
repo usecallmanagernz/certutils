@@ -67,7 +67,7 @@ def strip_sgn(sgn_file):
 
 
 def main():
-    short_options = 'h'
+    short_options = 'H'
     long_options = ['help']
 
     sgn_file = None
@@ -76,28 +76,29 @@ def main():
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
     except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:])
+        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
     for option, argument in options:
-        if option in ('-h', '--help'):
+        if option in ('-H', '--help'):
             help = True
-
-    if len(arguments):
-        sgn_file = arguments[0]
 
     if help:
         print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] SGN-FILE\n'
               'Remove .sgn header from a file\n'
               '\n'
-              '  -h, --help    print this help and exit\n')
+              '  -H, --help    print this help and exit\n')
 
         return
+
+    if len(arguments):
+        sgn_file = arguments[0]
 
     if sgn_file is None:
         raise ProgramError('No .sgn file specified')
 
     if not sgn_file.endswith('.sgn'):
-        raise Interna;Error(f'File {sgn_file} does not end with .sgn')
+        raise ProgramError(f'File {sgn_file} does not end with .sgn')
 
     strip_sgn(sgn_file)
 

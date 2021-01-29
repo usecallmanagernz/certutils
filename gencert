@@ -4,11 +4,11 @@
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-OPTIONS=$(getopt -n ${0##*/} -o "C:O:l:s:t:e:a:b:E:y:d:o:c:rih" \
-    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,cacert:,rootca,intermediateca,help" -- "$@")
+OPTIONS=$(getopt -n ${0##*/} -o "C:O:l:s:t:e:a:b:E:y:d:o:c:riH" \
+    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,ca:,root,intermediate,help" -- "$@")
 
 if [[ $? -ne 0 ]]; then
-    echo "Try \`${0##*/} --help' for more information"
+    echo "Try '${0##*/} --help' for more information"
     exit 1
 fi
 
@@ -119,7 +119,7 @@ while true; do
         OUTPUT_FILE="$1"
         shift 1
         ;;
-    -c|--cacert)
+    -c|--ca)
         CA_CERTIFICATE="$1"
         shift 1
 
@@ -134,7 +134,7 @@ while true; do
     -i|--intermediate)
         INTERMEDIATE_CA=true
         ;;
-    -h|--help)
+    -H|--help)
         echo "Usage: ${0##*/} [OPTIONS]"
         echo "Generate and sign X509 certificates"
         echo ""
@@ -150,7 +150,7 @@ while true; do
         echo "  -E, --curve CURVE                  generate an EC key instead of an RSA key"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256, sha384 or sha512 (default sha256)"
         echo "  -o, --output                       output file"
-        echo "  -c, --cacert                       CA certificate to use for signing"
+        echo "  -c, --ca                           CA certificate to use for signing"
         echo "  -r, --root                         generate a Root CA certificate to use for signing"
         echo "  -i, --intermediate                 generate an Intermediate CA certificate to use for signing"
         echo "  -h, --help                         print this help and exit"

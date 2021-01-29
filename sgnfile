@@ -47,9 +47,9 @@ class ProgramError(Exception):
     pass
 
 
-def parse_sgn(tlv_file, certificate_file):
+def parse_sgn(sgn_file, certificate_file):
     try:
-        with open(tlv_file, 'rb') as file:
+        with open(sgn_file, 'rb') as file:
             tlv_data = file.read()
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
@@ -209,7 +209,7 @@ def parse_sgn(tlv_file, certificate_file):
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {header_digest_algorithm}')
 
     if header_signature_index is None:
-        raise ProgramError(f'Missing HEADER_SIGNATURE')
+        raise ProgramError('Missing HEADER_SIGNATURE')
 
     if certificate_file is None:
         print('No certificate specified, unable to check signature')
@@ -245,6 +245,50 @@ def parse_sgn(tlv_file, certificate_file):
         return
 
     print('Valid signature')
+
+
+def remove_sgn(sgn_file):
+    try:
+        with open(sgn_file, 'rb') as file:
+            tlv_data = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    tlv_index = 0
+
+    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
+
+    if tag != HEADER_VERSION:
+        raise ProgramError(f'Tag is not HEADER_VERSION: {tag}')
+
+    if length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_VERSION: {length}')
+
+    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
+
+    if tag != HEADER_LENGTH:
+        raise ProgramError(f'Tag is not HEADER_LENGTH: {tag}')
+
+    if length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {length}')
+
+    (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+    tlv_index += length
+
+    # Remove .sgn suffix
+    ouput_file = sgn_file[:-4]
+
+    try:
+        with open(output_file, 'wb') as file:
+            file.write(tlv_data[header_length:])
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    print(f'Wrote {output_file}')
 
 
 oid_names = {
@@ -393,19 +437,21 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
 
 def main():
-    short_options = 'pbhc:d:F:'
-    long_options = ['parse', 'build', 'help', 'certificate=', 'digest=', 'filename=']
+    short_options = 'pbrc:d:F:H'
+    long_options = ['parse', 'build', 'remove', 'certificate=', 'digest=', 'filename=', 'help']
 
     mode = None
     sgn_file = input_file = None
     certificate_file = None
     digest_algorithm = 'sha1'
     filename = None
+    help = False
 
     try:
         options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
     except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:])
+        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
     for option, argument in options:
         if option in ('-p', '--parse'):
@@ -414,8 +460,8 @@ def main():
         elif option in ('-b', '--build'):
             mode = 'build'
 
-        elif option in ('-h', '--help'):
-            mode = 'help'
+        elif option in ('-r', '--remove'):
+            mode = 'remove'
 
         elif option in ('-c', '--certificate'):
             certificate_file = argument
@@ -429,37 +475,44 @@ def main():
         elif option in ('-F', '--filename'):
             filename = argument
 
-    if len(arguments):
-        sgn_file = input_file = arguments[0]
+        elif option in ('-H', '--help'):
+            help = True
 
-    if mode is None:
-        raise ProgramError('Either -p/--parse, -b/--build or -h/--help must be specified')
-
-    if mode == 'help':
+    if help:
         print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] {SGN-FILE | FILE}\n'
-              'Parse or build .sgn files\n'
+              'Parse, build or remove (unsign) .sgn files\n'
               '\n'
               '  -p, --parse                    parse the specified .sgn file\n'
               '  -b, --build                    build new .sgn file using options below\n'
-              '  -h, --help                     print this help and exit\n'
+              '  -r, --remove                   remove (unsign) a .sgn file\n'
               '  -c, --certificate CERT-FILE    header signing certificate\n'
               '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
-              '  -F, --filename NAME            file name to store in .sgn header\n')
+              '  -F, --filename NAME            file name to store in .sgn header\n'
+              '  -H, --help                     print this help and exit\n')
 
         return
 
-    if mode == 'parse':
+    if mode is None:
+        raise ProgramError('No mode specified (either parse, build or remove). Try --help')
+
+    if len(arguments):
+        sgn_file = input_file = arguments[0]
+
+    if mode in ('parse', 'remove'):
         if sgn_file is None:
             raise ProgramError('No .sgn file specified')
 
-        parse_sgn(sgn_file, certificate_file)
+        if mode == 'parse':
+            parse_sgn(sgn_file, certificate_file)
+        elif mode == 'remove':
+            remove_sgn(sgn_file)
 
     elif mode == 'build':
         if input_file is None:
             raise ProgramError('No file specified')
 
         if certificate_file is None:
-            raise ProgramError('No .pem file specified for -c/--certificate')
+            raise ProgramError('No certificate .pem file specified')
 
         if filename is None:
             filename = os.path.basename(input_file) + '.sgn'
