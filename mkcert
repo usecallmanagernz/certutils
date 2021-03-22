@@ -4,8 +4,8 @@
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-OPTIONS=$(getopt -n ${0##*/} -o "C:O:l:s:t:e:a:b:E:y:d:o:c:riH" \
-    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,ca:,root,intermediate,help" -- "$@")
+OPTIONS=$(getopt -n ${0##*/} -o "c:o:l:s:C:e:a:b:E:y:d:f:H" \
+    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,help" -- "$@")
 
 if [[ $? -ne 0 ]]; then
     echo "Try '${0##*/} --help' for more information"
@@ -21,16 +21,11 @@ STATE=""
 COUNTRY=""
 EMAIL_ADDRESS=""
 ALTERNATE_NAMES=()
-
 BITS="2048"
 CURVE=""
 YEARS="10"
 DIGEST="sha256"
-
-CA_CERTIFICATE=""
 OUTPUT_FILE=""
-ROOT_CA=false
-INTERMEDIATE_CA=false
 
 while true; do
     OPTION="$1"
@@ -39,7 +34,7 @@ while true; do
     [[ -n $OPTION ]] || break
 
     case "$OPTION" in
-    -C|--common)
+    -c|--common)
         COMMON_NAME="$1"
         shift 1
         ;;
@@ -55,7 +50,7 @@ while true; do
         STATE="$1"
         shift 1
         ;;
-    -t|--country)
+    -C|--country)
         COUNTRY="${1^^[A-Z]}"
         shift 1
 
@@ -115,44 +110,26 @@ while true; do
             exit 1
         fi
         ;;
-    -o|--output)
+    -f|--file)
         OUTPUT_FILE="$1"
         shift 1
         ;;
-    -c|--ca)
-        CA_CERTIFICATE="$1"
-        shift 1
-
-        if [[ ! -f $CA_CERTIFICATE ]]; then
-            echo "CA certificate does not exist"
-            exit 1
-        fi
-        ;;
-    -r|--root)
-        ROOT_CA=true
-        ;;
-    -i|--intermediate)
-        INTERMEDIATE_CA=true
-        ;;
     -H|--help)
         echo "Usage: ${0##*/} [OPTIONS]"
-        echo "Generate and sign X509 certificates"
+        echo "Create a self-signed X509 certificate"
         echo ""
-        echo "  -C, --common COMMON-NAME           common name"
-        echo "  -O, --organization ORGANIZATION    organization"
+        echo "  -c, --common COMMON-NAME           common name"
+        echo "  -o, --organization ORGANIZATION    organization"
         echo "  -l, --locality LOCALITY            locality"
         echo "  -s, --state STATE                  state or province"
-        echo "  -t, --country COUNTRY              country code"
+        echo "  -C, --country COUNTRY              country code"
         echo "  -a, --alternate DNS-NAME           alternate DNS name, can be specified more than once"
         echo "  -e, --email EMAIL                  email address"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
-        echo "  -E, --curve CURVE                  generate an EC key instead of an RSA key"
+        echo "  -E, --curve CURVE                  generate an EC key using curve instead of an RSA key"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256, sha384 or sha512 (default sha256)"
-        echo "  -o, --output                       output file"
-        echo "  -c, --ca                           CA certificate to use for signing"
-        echo "  -r, --root                         generate a Root CA certificate to use for signing"
-        echo "  -i, --intermediate                 generate an Intermediate CA certificate to use for signing"
+        echo "  -f, --file                         output file"
         echo "  -h, --help                         print this help and exit"
         echo ""
 
@@ -198,46 +175,19 @@ serial = $TEMP_DIR/serial.txt
 default_startdate = $START_DATE
 default_enddate = $END_DATE
 default_md = $DIGEST
-EOF
-
-if $ROOT_CA; then
-    cat >> "$TEMP_DIR/openssl.cnf" <<EOF
 certificate = $TEMP_DIR/crt.pem
 private_key = $TEMP_DIR/key.pem
-x509_extensions = req_extensions
-EOF
-else
-    cat >> "$TEMP_DIR/openssl.cnf" <<EOF
-certificate = $CA_CERTIFICATE
-private_key = $CA_CERTIFICATE
-x509_extensions = ca_extensions
-EOF
-fi
-
-cat >> "$TEMP_DIR/openssl.cnf" <<EOF
+x509_extensions = x509_extensions
 policy = policy_default
 copy_extensons = none
 email_in_dn = yes
 preserve = no
 unique_subject = no
 
-[ca_extensions]
-EOF
-
-if $INTERMEDIATE_CA; then
-    cat >> "$TEMP_DIR/openssl.cnf" <<EOF
+[x509_extensions]
 basicConstraints = CA:true, pathlen:0
-keyUsage = Certificate Sign, CRL Sign
-EOF
-else
-    cat >> "$TEMP_DIR/openssl.cnf" <<EOF
-basicConstraints = CA:false
-keyUsage = Digital Signature, Key Encipherment, Data Encipherment
+keyUsage = Certificate Sign, Digital Signature, Key Encipherment, Data Encipherment
 extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication
-EOF
-fi
-
-cat >> "$TEMP_DIR/openssl.cnf" <<EOF
 subjectKeyIdentifier = hash
 ${ALTERNATE_NAMES[@]:+subjectAltName = @alternate_names}
 
@@ -250,16 +200,10 @@ countryName = optional
 emailAddress = optional
 
 [req]
-req_extensions = req_extensions
+req_extensions = x509_extensions
 distinguished_name = distinguished_name
 default_md = $DIGEST
 prompt = no
-
-[req_extensions]
-basicConstraints = CA:true
-keyUsage = Certificate Sign, CRL Sign
-subjectKeyIdentifier = hash
-${ALTERNATE_NAMES[@]:+subjectAltName = @alternate_names}
 
 [distinguished_name]
 commonName = $COMMON_NAME
@@ -300,29 +244,13 @@ if ! openssl req -config "$TEMP_DIR/openssl.cnf" -new -batch \
     exit 1
 fi
 
-if $ROOT_CA; then
-    if ! openssl ca -config "$TEMP_DIR/openssl.cnf" -notext -selfsign -batch \
-         -in "$TEMP_DIR/req.pem" -out "$TEMP_DIR/crt.pem" 2> /dev/null; then
-        echo "Error while signing CA certificate"
-        exit 1
-    fi
-
-    cat "$TEMP_DIR/key.pem" "$TEMP_DIR/crt.pem" > "$OUTPUT_FILE"
-    echo "New CA certificate created. Certificate and private-key saved in $OUTPUT_FILE"
-else
-    if [[ -z $CA_CERTIFICATE ]]; then
-        echo "No CA certificate specified"
-        exit 1
-    fi
-
-    if ! openssl ca -config "$TEMP_DIR/openssl.cnf" -notext -batch \
-         -in "$TEMP_DIR/req.pem" -out "$TEMP_DIR/crt.pem" 2> /dev/null; then
-        echo "Error while signing certificate"
-        exit 1
-    fi
-
-    cat "$TEMP_DIR/key.pem" "$TEMP_DIR/crt.pem" > "$OUTPUT_FILE"
-    echo "New certificate signed by the CA. Certificate and private-key saved to $OUTPUT_FILE"
+if ! openssl ca -config "$TEMP_DIR/openssl.cnf" -notext -selfsign -batch \
+     -in "$TEMP_DIR/req.pem" -out "$TEMP_DIR/crt.pem" 2> /dev/null; then
+    echo "Error while signing CA certificate"
+    exit 1
 fi
+
+cat "$TEMP_DIR/key.pem" "$TEMP_DIR/crt.pem" > "$OUTPUT_FILE"
+echo "New certificate and private-key saved in $OUTPUT_FILE"
 
 exit 0

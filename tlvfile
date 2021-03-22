@@ -652,8 +652,8 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
 
 
 def main():
-    short_options = 'pbc:v:d:F:r:f:H'
-    long_options = ['parse', 'build', 'certificate=', 'version=', 'digest=', 'filename=', 'record=', 'function=', 'help']
+    short_options = 'pbs:v:d:F:r:f:H'
+    long_options = ['parse', 'build', 'sast=', 'version=', 'digest=', 'filename=', 'record=', 'function=', 'help']
 
     mode = None
     tlv_file = None
@@ -679,7 +679,7 @@ def main():
         elif option in ('-b', '--build'):
             mode = 'build'
 
-        elif option in ('-c', '--certificate'):
+        elif option in ('-s', '--sast'):
             certificate_file = argument
 
         elif option in ('-v', '--version'):
@@ -705,7 +705,7 @@ def main():
                 raise ProgramError(f'Invalid function: {argument}')
 
             if record is None:
-                raise ProgramError(f'No -r/--record argument supplied for {argument}')
+                raise ProgramError(f'No record certificate supplied for {argument}')
 
             function = argument
             records.append((record, function))
@@ -719,8 +719,8 @@ def main():
               '\n'
               '  -p, --parse                    parse the specified .tlv file\n'
               '  -b, --build                    build new .tlv file using options below\n'
-              '  -c, --certificate CERT-FILE    header signing certificate, also included as the first sast record\n'
-              '  -v, --version VERSION          header signer version 1.0 or 1.1 (default 1.0)\n'
+              '  -s, --sast CERT-FILE           signing certificate with sast role\n'
+              '  -v, --version VERSION          signer version: 1.0 or 1.1 (default 1.0)\n'
               '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
               '  -F, --filename NAME            file name to store in .tlv header\n'
               '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'

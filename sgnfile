@@ -266,6 +266,8 @@ def remove_sgn(sgn_file):
     if length != 2:
         raise ProgramError(f'Unsupported length for HEADER_VERSION: {length}')
 
+    tlv_index += length
+
     (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
     tlv_index += 3
 
@@ -279,7 +281,7 @@ def remove_sgn(sgn_file):
     tlv_index += length
 
     # Remove .sgn suffix
-    ouput_file = sgn_file[:-4]
+    output_file = sgn_file[:-4]
 
     try:
         with open(output_file, 'wb') as file:
@@ -437,8 +439,8 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
 
 def main():
-    short_options = 'pbrc:d:F:H'
-    long_options = ['parse', 'build', 'remove', 'certificate=', 'digest=', 'filename=', 'help']
+    short_options = 'pbrt:d:F:H'
+    long_options = ['parse', 'build', 'remove', 'tftp=', 'digest=', 'filename=', 'help']
 
     mode = None
     sgn_file = input_file = None
@@ -463,7 +465,7 @@ def main():
         elif option in ('-r', '--remove'):
             mode = 'remove'
 
-        elif option in ('-c', '--certificate'):
+        elif option in ('-t', '--tftp'):
             certificate_file = argument
 
         elif option in ('-d', '--digest'):
@@ -485,7 +487,7 @@ def main():
               '  -p, --parse                    parse the specified .sgn file\n'
               '  -b, --build                    build new .sgn file using options below\n'
               '  -r, --remove                   remove (unsign) a .sgn file\n'
-              '  -c, --certificate CERT-FILE    header signing certificate\n'
+              '  -t, --tftp CERT-FILE           signing certificate with tftp role\n'
               '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
               '  -F, --filename NAME            file name to store in .sgn header\n'
               '  -H, --help                     print this help and exit\n')
