@@ -39,8 +39,7 @@ HEADER_TIMESTAMP = 15
 
 DIGEST_SHA1 = 1
 DIGEST_SHA256 = 2
-DIGEST_SHA348 = 3
-DIGEST_SHA512 = 4
+DIGEST_SHA512 = 3
 
 
 class ProgramError(Exception):
@@ -280,8 +279,13 @@ def remove_sgn(sgn_file):
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += length
 
-    # Remove .sgn suffix
-    output_file = sgn_file[:-4]
+    # Remove .sgn or .sha512
+    if sgn_file.endswith('.sgn'):
+        output_file = sgn_file[:-4]
+    elif sgn_file.endswith('.sha512'):
+        output_file = sgn_file[:-7]
+    else:
+        raise ProgramError(f'File name must end in .sgn or .sha512: {sgn_file}')
 
     try:
         with open(output_file, 'wb') as file:
@@ -416,7 +420,7 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     elif digest_algorithm == 'sha512':
         hash = hashes.SHA512()
     else:
-        raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {hash}')
+        raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {digest_algorithm}')
 
     tlv_data = bytes(tlv_data)
     signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
@@ -502,7 +506,7 @@ def main():
 
     if mode in ('parse', 'remove'):
         if sgn_file is None:
-            raise ProgramError('No .sgn file specified')
+            raise ProgramError('No .sgn or .sha512 file specified')
 
         if mode == 'parse':
             parse_sgn(sgn_file, certificate_file)

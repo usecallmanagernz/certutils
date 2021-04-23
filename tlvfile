@@ -56,8 +56,7 @@ RECORD_HASH_ALGORITHM = 12
 
 DIGEST_SHA1 = 1
 DIGEST_SHA256 = 2
-DIGEST_SHA348 = 3
-DIGEST_SHA512 = 4
+DIGEST_SHA512 = 3
 
 FUNCTION_SAST = 0
 FUNCTION_CCM = 1
@@ -631,7 +630,7 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
     elif digest_algorithm == 'sha512':
         hash = hashes.SHA512()
     else:
-        raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {hash}')
+        raise ProgramError(f'Unsupported DIGEST_ALGORITHM: {digest_algorithm}')
 
     tlv_data = bytes(tlv_data)
     signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)

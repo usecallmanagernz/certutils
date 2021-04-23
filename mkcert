@@ -105,7 +105,7 @@ while true; do
         DIGEST="$1"
         shift 1
 
-        if [[ $DIGEST != +(md5|sha1|sha256|sha384|sha512) ]]; then
+        if [[ $DIGEST != +(md5|sha1|sha256|sha512) ]]; then
             echo "Invaid digest: $DIGEST" >&2
             exit 1
         fi
@@ -128,7 +128,7 @@ while true; do
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
         echo "  -E, --curve CURVE                  generate an EC key using curve instead of an RSA key"
-        echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256, sha384 or sha512 (default sha256)"
+        echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
         echo "  -f, --file                         output file"
         echo "  -h, --help                         print this help and exit"
         echo ""
@@ -159,12 +159,10 @@ TEMP_DIR=$(mktemp -d /tmp/gencert-XXXXXXXX) || exit 1
 trap "rm -rf $TEMP_DIR" EXIT
 touch "$TEMP_DIR/random" "$TEMP_DIR/database.txt" "$TEMP_DIR/database.txt.attr"
 
-SERIAL_NUMBER=$(hexdump -n 16 -v -e "1/1 \"%02X\"" /dev/urandom)
+SERIAL_NUMBER=$(openssl rand -hex 16)
 echo "$SERIAL_NUMBER" > "$TEMP_DIR/serial.txt"
 
 cat >> "$TEMP_DIR/openssl.cnf" <<EOF
-RANDFILE = $TEMP_DIR/random
-
 [ca]
 default_ca = ca_default
 
