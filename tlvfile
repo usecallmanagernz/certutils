@@ -707,7 +707,7 @@ def main():
                     raise ProgramError(f'Invalid function: {function}')
 
                 if record is None:
-                    raise ProgramError(f'No record certificate supplied for {argument}')
+                    raise ProgramError(f'No record certificate supplied for {function}')
 
                 records.append((record, function))
 
