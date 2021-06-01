@@ -115,7 +115,7 @@ while true; do
         shift 1
         ;;
     -H|--help)
-        echo "Usage: ${0##*/} [OPTIONS]"
+        echo "Usage: ${0##*/} [OPTIONS] [COMMON-NAME]"
         echo "Create a self-signed X509 certificate"
         echo ""
         echo "  -c, --common COMMON-NAME           common name"
@@ -129,22 +129,25 @@ while true; do
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
         echo "  -E, --curve CURVE                  generate an EC key using curve instead of an RSA key"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
-        echo "  -f, --file                         output file"
+        echo "  -f, --file PEM-FILE                output .pem file"
         echo "  -h, --help                         print this help and exit"
         echo ""
 
         exit 0
         ;;
     --)
-        shift 1
         break
         ;;
     esac
 done
 
 if [[ -z $COMMON_NAME ]]; then
-    echo "No common name specified"
-    exit 1
+    COMMON_NAME="$1"
+
+    if [[ -z $COMMON_NAME ]]; then
+        echo "No common name specified"
+        exit 1
+    fi
 fi
 
 if [[ -z $OUTPUT_FILE ]]; then

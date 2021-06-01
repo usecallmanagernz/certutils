@@ -651,113 +651,110 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
 
 
 def main():
-    short_options = 'pbs:v:d:F:r:f:H'
-    long_options = ['parse', 'build', 'sast=', 'version=', 'digest=', 'filename=', 'record=', 'function=', 'help']
-
-    mode = None
-    tlv_file = None
-    certificate_file = None
-    version = '1.0'
-    digest_algorithm = 'sha1'
-    filename = None
-    record = None
-    function = None
-    records = []
-    help = False
-
     try:
-        options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
-    except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
-                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
+        short_options = 'pbs:v:d:F:r:f:H'
+        long_options = ['parse', 'build', 'sast=', 'version=', 'digest=', 'filename=', 'record=', 'function=', 'help']
 
-    for option, argument in options:
-        if option in ('-p', '--parse'):
-            mode = 'parse'
+        mode = None
+        tlv_file = None
+        certificate_file = None
+        version = '1.0'
+        digest_algorithm = 'sha1'
+        filename = None
+        record = None
+        function = None
+        records = []
+        help = False
 
-        elif option in ('-b', '--build'):
-            mode = 'build'
+        try:
+            options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
+        except getopt.GetoptError as error:
+            raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                               '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
-        elif option in ('-s', '--sast'):
-            certificate_file = argument
+        for option, argument in options:
+            if option in ('-p', '--parse'):
+                mode = 'parse'
 
-        elif option in ('-v', '--version'):
-            if argument not in ('1.0', '1.1'):
-                raise ProgramError(f'Invalid version: {argument}')
+            elif option in ('-b', '--build'):
+                mode = 'build'
 
-            version = argument
+            elif option in ('-s', '--sast'):
+                certificate_file = argument
 
-        elif option in ('-d', '--digest'):
-            if argument not in ('sha1', 'sha512'):
-                raise ProgramError(f'Invalid digest: {argument}')
+            elif option in ('-v', '--version'):
+                version = argument
 
-            digest_algorithm = argument
+                if version not in ('1.0', '1.1'):
+                    raise ProgramError(f'Invalid version: {version}')
 
-        elif option in ('-F', '--filename'):
-            filename = argument
+            elif option in ('-d', '--digest'):
+                digest_algorithm = argument
 
-        elif option in ('-r', '--record'):
-            record = argument
+                if digest_algorithm not in ('sha1', 'sha512'):
+                    raise ProgramError(f'Invalid digest: {digest_algorithm}')
 
-        elif option in ('-f', '--function'):
-            if argument not in ('sast', 'ccm', 'tftp', 'ccm+tftp', 'https', 'tvs', 'capf'):
-                raise ProgramError(f'Invalid function: {argument}')
+            elif option in ('-F', '--filename'):
+                filename = argument
 
-            if record is None:
-                raise ProgramError(f'No record certificate supplied for {argument}')
+            elif option in ('-r', '--record'):
+                record = argument
 
-            function = argument
-            records.append((record, function))
+            elif option in ('-f', '--function'):
+                function = argument
 
-        elif option in ('-H', '--help'):
-            help = True
+                if function not in ('sast', 'ccm', 'tftp', 'ccm+tftp', 'https', 'tvs', 'capf'):
+                    raise ProgramError(f'Invalid function: {function}')
 
-    if help:
-        print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] TLV-FILE\n'
-              'Parse or build .tlv files\n'
-              '\n'
-              '  -p, --parse                    parse the specified .tlv file\n'
-              '  -b, --build                    build new .tlv file using options below\n'
-              '  -s, --sast CERT-FILE           signing certificate with sast role\n'
-              '  -v, --version VERSION          signer version: 1.0 or 1.1 (default 1.0)\n'
-              '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
-              '  -F, --filename NAME            file name to store in .tlv header\n'
-              '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'
-              '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp, https, tvs or capf\n'
-              '  -H, --help                     print this help and exit\n')
+                if record is None:
+                    raise ProgramError(f'No record certificate supplied for {argument}')
 
-        return
+                records.append((record, function))
 
-    if mode is None:
-        raise ProgramError('No mode specified (either parse or build). Try --help')
+            elif option in ('-H', '--help'):
+                help = True
 
-    if len(arguments):
-        tlv_file = arguments[0]
+        if help:
+            print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] TLV-FILE\n'
+                  'Parse or build .tlv files\n'
+                  '\n'
+                  '  -p, --parse                    parse the specified .tlv file\n'
+                  '  -b, --build                    build new .tlv file using options below\n'
+                  '  -s, --sast CERT-FILE           signing certificate with sast role\n'
+                  '  -v, --version VERSION          signer version: 1.0 or 1.1 (default 1.0)\n'
+                  '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
+                  '  -F, --filename NAME            file name to store in .tlv header\n'
+                  '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'
+                  '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp, https, tvs or capf\n'
+                  '  -H, --help                     print this help and exit\n')
 
-    if tlv_file is None:
-        raise ProgramError('No .tlv file specified')
+            return
 
-    if mode == 'parse':
-        parse_tlv(tlv_file)
+        if mode is None:
+            raise ProgramError('No mode specified (either parse or build). Try --help')
 
-    elif mode == 'build':
-        if certificate_file is None:
-            raise ProgramError('No certificate .pem file specified')
+        if len(arguments):
+            tlv_file = arguments[0]
 
-        if not len(records):
-            raise ProgramError('No record certificates specified')
+        if tlv_file is None:
+            raise ProgramError('No .tlv file specified')
 
-        if filename is None:
-            filename = os.path.basename(tlv_file)
+        if mode == 'parse':
+            parse_tlv(tlv_file)
 
-        # Add the signing certificate in the SAST role
-        records.insert(0, (certificate_file, 'sast'))
-        build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, records)
+        elif mode == 'build':
+            if certificate_file is None:
+                raise ProgramError('No certificate .pem file specified')
 
+            if not len(records):
+                raise ProgramError('No record certificates specified')
 
-if __name__ == '__main__':
-    try:
-        main()
+            if filename is None:
+                filename = os.path.basename(tlv_file)
+
+            # Add the signing certificate in the SAST role
+            records.insert(0, (certificate_file, 'sast'))
+            build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, records)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)
@@ -768,3 +765,7 @@ if __name__ == '__main__':
         exit(1)
 
     exit(0)
+
+
+if __name__ == '__main__':
+    main()

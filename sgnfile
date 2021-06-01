@@ -443,92 +443,88 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
 
 def main():
-    short_options = 'pbrt:d:F:H'
-    long_options = ['parse', 'build', 'remove', 'tftp=', 'digest=', 'filename=', 'help']
-
-    mode = None
-    sgn_file = input_file = None
-    certificate_file = None
-    digest_algorithm = 'sha1'
-    filename = None
-    help = False
-
     try:
-        options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
-    except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
-                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
+        short_options = 'pbrt:d:F:H'
+        long_options = ['parse', 'build', 'remove', 'tftp=', 'digest=', 'filename=', 'help']
 
-    for option, argument in options:
-        if option in ('-p', '--parse'):
-            mode = 'parse'
+        mode = None
+        sgn_file = input_file = None
+        certificate_file = None
+        digest_algorithm = 'sha1'
+        filename = None
+        help = False
 
-        elif option in ('-b', '--build'):
-            mode = 'build'
+        try:
+            options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
+        except getopt.GetoptError as error:
+            raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                               '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
-        elif option in ('-r', '--remove'):
-            mode = 'remove'
+        for option, argument in options:
+            if option in ('-p', '--parse'):
+                mode = 'parse'
 
-        elif option in ('-t', '--tftp'):
-            certificate_file = argument
+            elif option in ('-b', '--build'):
+                mode = 'build'
 
-        elif option in ('-d', '--digest'):
-            if argument not in ('sha1', 'sha512'):
-                raise ProgramError(f'Invalid digest: {argument}')
+            elif option in ('-r', '--remove'):
+                mode = 'remove'
 
-            digest_algorithm = argument
+            elif option in ('-t', '--tftp'):
+                certificate_file = argument
 
-        elif option in ('-F', '--filename'):
-            filename = argument
+            elif option in ('-d', '--digest'):
+                digest_algorithm = argument
 
-        elif option in ('-H', '--help'):
-            help = True
+                if digest_algorithm not in ('sha1', 'sha512'):
+                    raise ProgramError(f'Invalid digest: {digest_algorithm}')
 
-    if help:
-        print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] {SGN-FILE | FILE}\n'
-              'Parse, build or remove (unsign) .sgn files\n'
-              '\n'
-              '  -p, --parse                    parse the specified .sgn file\n'
-              '  -b, --build                    build new .sgn file using options below\n'
-              '  -r, --remove                   remove (unsign) a .sgn file\n'
-              '  -t, --tftp CERT-FILE           signing certificate with tftp role\n'
-              '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
-              '  -F, --filename NAME            file name to store in .sgn header\n'
-              '  -H, --help                     print this help and exit\n')
+            elif option in ('-F', '--filename'):
+                filename = argument
 
-        return
+            elif option in ('-H', '--help'):
+                help = True
 
-    if mode is None:
-        raise ProgramError('No mode specified (either parse, build or remove). Try --help')
+        if help:
+            print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] {SGN-FILE | FILE}\n'
+                  'Parse, build or remove (unsign) .sgn files\n'
+                  '\n'
+                  '  -p, --parse                    parse the specified .sgn file\n'
+                  '  -b, --build                    build new .sgn file using options below\n'
+                  '  -r, --remove                   remove (unsign) a .sgn file\n'
+                  '  -t, --tftp CERT-FILE           signing certificate with tftp role\n'
+                  '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
+                  '  -F, --filename NAME            file name to store in .sgn header\n'
+                  '  -H, --help                     print this help and exit\n')
 
-    if len(arguments):
-        sgn_file = input_file = arguments[0]
+            return
 
-    if mode in ('parse', 'remove'):
-        if sgn_file is None:
-            raise ProgramError('No .sgn or .sha512 file specified')
+        if mode is None:
+            raise ProgramError('No mode specified (either parse, build or remove). Try --help')
 
-        if mode == 'parse':
-            parse_sgn(sgn_file, certificate_file)
-        elif mode == 'remove':
-            remove_sgn(sgn_file)
+        if len(arguments):
+            sgn_file = input_file = arguments[0]
 
-    elif mode == 'build':
-        if input_file is None:
-            raise ProgramError('No file specified')
+        if mode in ('parse', 'remove'):
+            if sgn_file is None:
+                raise ProgramError('No .sgn or .sha512 file specified')
 
-        if certificate_file is None:
-            raise ProgramError('No certificate .pem file specified')
+            if mode == 'parse':
+                parse_sgn(sgn_file, certificate_file)
+            elif mode == 'remove':
+                remove_sgn(sgn_file)
 
-        if filename is None:
-            filename = os.path.basename(input_file) + '.sgn'
+        elif mode == 'build':
+            if input_file is None:
+                raise ProgramError('No file specified')
 
-        build_sgn(input_file, certificate_file, digest_algorithm, filename)
+            if certificate_file is None:
+                raise ProgramError('No certificate .pem file specified')
 
+            if filename is None:
+                filename = os.path.basename(input_file) + '.sgn'
 
-if __name__ == '__main__':
-    try:
-        main()
+            build_sgn(input_file, certificate_file, digest_algorithm, filename)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)
@@ -539,3 +535,7 @@ if __name__ == '__main__':
         exit(1)
 
     exit(0)
+
+
+if __name__ == '__main__':
+    main()
