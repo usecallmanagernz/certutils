@@ -20,7 +20,7 @@ class ProgramError(Exception):
     pass
 
 
-def certificate_hash(certificate_file, digest_algorithm):
+def hash_certificate(certificate_file, digest_algorithm):
     try:
         with open(certificate_file, 'rb') as file:
             content = file.read()
@@ -87,7 +87,7 @@ def main():
     if certificate_file is None:
         raise ProgramError('No certificate file specified')
 
-    certificate_hash(certificate_file, digest_algorithm)
+    hash_certificate(certificate_file, digest_algorithm)
 
 
 if __name__ == '__main__':

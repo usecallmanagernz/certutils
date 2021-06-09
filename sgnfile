@@ -85,7 +85,6 @@ def parse_sgn(sgn_file, certificate_file):
 
     print(f'Header Length:    {header_length} bytes')
 
-    header_serial_number = None
     header_digest_algorithm = None
 
     header_signature_index = 0
@@ -119,8 +118,6 @@ def parse_sgn(sgn_file, certificate_file):
             serial_number = serial_number.decode('utf-8')
 
             print(f'Serial Number:    {serial_number}')
-
-            header_serial_number = serial_number
 
         elif tag == HEADER_CA_NAME:
             ca_name = tlv_data[tlv_index:tlv_index + length]
@@ -158,14 +155,12 @@ def parse_sgn(sgn_file, certificate_file):
             if length != 1:
                 raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_ALGORITHM: {length}')
 
-            (signature_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
         elif tag == HEADER_SIGNATURE_MODULUS:
             if length != 1:
-               raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
+                raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
 
-            (signature_modulus,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
         elif tag == HEADER_SIGNATURE:

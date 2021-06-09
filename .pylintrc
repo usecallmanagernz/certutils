@@ -1,0 +1,9 @@
+[MASTER]
+persistent=no
+dummy-variables-rgx=(_+[a-zA-Z0-9]*?$)|dummy|unused
+
+[MESSAGES CONTROL]
+disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,line-too-long,bad-whitespace,too-many-branches,too-many-statements,too-many-arguments,too-many-locals,redefined-builtin,redefined-argument-from-local,no-else-continue,broad-except,consider-using-sys-exit,len-as-condition,invalid-name
+
+[REPORTS]
+output-format=text

@@ -4,7 +4,7 @@
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-OPTIONS=$(getopt -n ${0##*/} -o "c:o:l:s:C:e:a:b:E:y:d:f:H" \
+OPTIONS=$(getopt -n "${0##*/}" -o "c:o:l:s:C:e:a:b:E:y:d:f:H" \
     -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,help" -- "$@")
 
 if [[ $? -ne 0 ]]; then

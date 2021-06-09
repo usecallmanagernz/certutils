@@ -193,14 +193,12 @@ def parse_tlv(tlv_file):
             if length != 1:
                 raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_ALGORITHM: {length}')
 
-            (signature_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
         elif tag == HEADER_SIGNATURE_MODULUS:
             if length != 1:
-               raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
+                raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
 
-            (signature_modulus,) = struct.unpack_from('B', tlv_data, tlv_index)
             tlv_index += length
 
         elif tag == HEADER_SIGNATURE:
