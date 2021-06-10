@@ -4,9 +4,20 @@ on:
   push:
     branches:
       - master
+    paths:
+      - certhash
+      - sgnfile
+      - stripsgn
+      - tlvfile
+
   pull_request:
     branches:
       - master
+    paths:
+      - certhash
+      - sgnfile
+      - stripsgn
+      - tlvfile
 
 jobs:
   xmllint:

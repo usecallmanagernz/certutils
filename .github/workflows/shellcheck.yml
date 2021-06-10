@@ -4,9 +4,14 @@ on:
   push:
     branches:
       - master
+    paths:
+      - mkcert
+
   pull_request:
     branches:
       - master
+    paths:
+      - mkcert
 
 jobs:
   shellcheck:
