@@ -1,0 +1,25 @@
+name: python lint check
+  
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  xmllint:
+    name: Run python lint check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install packages
+        run: |
+          sudo apt install pylint python3-cryptography python3-asn1crypto
+
+      - name: Run pylint 
+        run: |
+          pylint certhash sgnfile stripsgn tlvfile 

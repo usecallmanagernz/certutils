@@ -1,0 +1,25 @@
+name: shell lint check
+  
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  shellcheck:
+    name: Run shell lint check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install packages
+        run: |
+          sudo apt install shellcheck
+
+      - name: Run shellcheck
+        run: |
+          shellcheck mkcert
