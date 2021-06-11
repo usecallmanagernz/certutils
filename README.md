@@ -1,4 +1,4 @@
-[![python lint check](https://github.com/usecallmanagernz/certutils/actions/workflows/pylint.yml/badge.svg?branch=master)](https://github.com/usecallmanagernz/certutils/actions/workflows/pylint.yml) [![shell lint check](https://github.com/usecallmanagernz/certutils/actions/workflows/shellcheck.yml/badge.svg?branch=master)](https://github.com/usecallmanagernz/certutils/actions/workflows/shellcheck.yml)
+[![python lint](https://github.com/usecallmanagernz/certutils/actions/workflows/pylint.yml/badge.svg?branch=master)](https://github.com/usecallmanagernz/certutils/actions/workflows/pylint.yml) [![shell lint](https://github.com/usecallmanagernz/certutils/actions/workflows/shellcheck.yml/badge.svg?branch=master)](https://github.com/usecallmanagernz/certutils/actions/workflows/shellcheck.yml)
 
 # Certificate Utilities
 

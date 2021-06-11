@@ -1,4 +1,4 @@
-name: shell lint check
+name: shell lint
   
 on:
   push:
@@ -14,8 +14,8 @@ on:
       - mkcert
 
 jobs:
-  shellcheck:
-    name: Run shell lint check
+  lint:
+    name: Run shell linter
     runs-on: ubuntu-latest
 
     steps:
