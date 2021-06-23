@@ -23,13 +23,13 @@ class ProgramError(Exception):
 def hash_certificate(certificate_file, digest_algorithm):
     try:
         with open(certificate_file, 'rb') as file:
-            content = file.read()
+            certificate = file.read()
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
     except ValueError:
         raise ProgramError(f'No certificate in file: {certificate_file}')
 
@@ -49,50 +49,46 @@ def hash_certificate(certificate_file, digest_algorithm):
 
 
 def main():
-    short_options = 'd:H'
-    long_options = ['digest=', 'help']
-
-    digest_algorithm = 'sha1'
-    certificate_file = None
-    help = False
-
     try:
-        options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
-    except getopt.GetoptError as error:
-        raise ProgramError(error.msg[0].upper() + error.msg[1:] +
-                           '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
+        short_options = 'd:H'
+        long_options = ['digest=', 'help']
 
-    for option, argument in options:
-        if option in ('-d', '--digest'):
-            if argument not in ('sha1', 'sha512'):
-                raise ProgramError(f'Invalid digest: {argument}')
+        digest_algorithm = 'sha1'
+        certificate_file = None
+        help = False
 
-            digest_algorithm = argument
+        try:
+            options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
+        except getopt.GetoptError as error:
+            raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                               '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
-        elif option in ('-H', '--help'):
-            help = True
+        for option, argument in options:
+            if option in ('-d', '--digest'):
+                digest_algorithm = argument
 
-    if help:
-        print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] CERT-FILE\n'
-              'Hash an x509 certificate and output as base64\n'
-              '\n'
-              '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha512 (default sha1)\n'
-              '  -H, --help                print this help and exit\n')
+                if digest_algorithm not in ('sha1', 'sha512'):
+                    raise ProgramError(f'Invalid digest: {digest_algorithm}')
 
-        return
+            elif option in ('-H', '--help'):
+                help = True
 
-    if len(arguments):
-        certificate_file = arguments[0]
+        if help:
+            print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] CERT-FILE\n'
+                  'Hash an x509 certificate and output as base64.\n'
+                  '\n'
+                  '  -d, --digest ALGORITHM    digest algorithm: sha1 or sha512 (default sha1)\n'
+                  '  -H, --help                print this help and exit\n')
 
-    if certificate_file is None:
-        raise ProgramError('No certificate file specified')
+            return
 
-    hash_certificate(certificate_file, digest_algorithm)
+        if len(arguments):
+            certificate_file = arguments[0]
 
+        if certificate_file is None:
+            raise ProgramError('No certificate file specified')
 
-if __name__ == '__main__':
-    try:
-        main()
+        hash_certificate(certificate_file, digest_algorithm)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)
@@ -103,3 +99,7 @@ if __name__ == '__main__':
         exit(1)
 
     exit(0)
+
+
+if __name__ == '__main__':
+    main()

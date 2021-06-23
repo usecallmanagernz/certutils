@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+#
 # Copyright (c) 2020 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
@@ -16,7 +17,6 @@ import traceback
 from cryptography.exceptions import InvalidSignature
 import cryptography.hazmat.backends as backends
 import cryptography.x509 as x509
-import cryptography.x509.oid as oid
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -46,7 +46,7 @@ class ProgramError(Exception):
     pass
 
 
-def parse_sgn(sgn_file, certificate_file):
+def parse_sgn(sgn_file, tftp_certificate_file):
     try:
         with open(sgn_file, 'rb') as file:
             tlv_data = file.read()
@@ -205,21 +205,21 @@ def parse_sgn(sgn_file, certificate_file):
     if header_signature_index is None:
         raise ProgramError('Missing HEADER_SIGNATURE')
 
-    if certificate_file is None:
+    if tftp_certificate_file is None:
         print('No certificate specified, unable to check signature')
         return
 
     try:
-        with open(certificate_file, 'rb') as file:
-            content = file.read()
+        with open(tftp_certificate_file, 'rb') as file:
+            certificate = file.read()
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in file: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
 
     public_key = certificate.public_key()
 
@@ -229,10 +229,10 @@ def parse_sgn(sgn_file, certificate_file):
         hash = hashes.SHA512()
 
     signature = tlv_data[header_signature_index + 3:header_signature_index + 3 + header_signature_length]
-    content = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
+    tlv_data = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
 
     try:
-        public_key.verify(signature, content, padding.PKCS1v15(), hash)
+        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hash)
 
     except InvalidSignature:
         print('Invalid signature')
@@ -292,33 +292,23 @@ def remove_sgn(sgn_file):
     print(f'Wrote {output_file}')
 
 
-oid_names = {
-    oid.NameOID.COMMON_NAME: 'CN',
-    oid.NameOID.ORGANIZATION_NAME: 'O',
-    oid.NameOID.ORGANIZATIONAL_UNIT_NAME: 'OU',
-    oid.NameOID.LOCALITY_NAME: 'L',
-    oid.NameOID.STATE_OR_PROVINCE_NAME: 'ST',
-    oid.NameOID.COUNTRY_NAME: 'C'
-}
-
-
-def build_sgn(input_file, certificate_file, digest_algorithm, filename):
+def build_sgn(input_file, tftp_certificate_file, digest_algorithm, filename):
     try:
-        with open(certificate_file, 'rb') as file:
-            content = file.read()
+        with open(tftp_certificate_file, 'rb') as file:
+            certificate = private_key = file.read()
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in file: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
 
     try:
-        private_key = serialization.load_pem_private_key(content, None, backends.default_backend())
+        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No private key in file: {certificate_file}')
+        raise ProgramError(f'No private key in file: {tftp_certificate_file}')
 
     header_signature_length = private_key.key_size // 8
 
@@ -331,19 +321,13 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     signer_name = ''
 
     for attribute in certificate.subject:
-        if attribute.oid not in oid_names:
-            continue
-
-        signer_name += (';' if len(signer_name) else '') + oid_names[attribute.oid] + '=' + attribute.value
+        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
 
     signer_name = signer_name.encode('utf-8') + b'\x00'
     ca_name = ''
 
     for attribute in certificate.issuer:
-        if attribute.oid not in oid_names:
-            continue
-
-        ca_name += (';' if len(ca_name) else '') + oid_names[attribute.oid] + '=' + attribute.value
+        ca_name += (';' if len(ca_name) else '') + attribute.rfc4514_string()
 
     ca_name = ca_name.encode('utf-8') + b'\x00'
 
@@ -405,10 +389,12 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
     try:
         with open(input_file, 'rb') as file:
-            tlv_data += file.read()
+            tlv_data += file.read() # Append file contents
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    sgn_file = input_file + '.sgn'
 
     if digest_algorithm == 'sha1':
         hash = hashes.SHA1()
@@ -420,16 +406,11 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
     tlv_data = bytes(tlv_data)
     signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
 
-    content = tlv_data[:header_signature_index]
-    content += struct.pack('> B H', HEADER_SIGNATURE, len(signature))
-    content += signature
-    content += tlv_data[header_signature_index:]
-
-    sgn_file = input_file + '.sgn'
-
     try:
         with open(sgn_file, 'wb') as file:
-            file.write(content)
+            file.write(tlv_data[:header_signature_index])
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
+            file.write(tlv_data[header_signature_index:])
 
     except (PermissionError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
@@ -439,12 +420,12 @@ def build_sgn(input_file, certificate_file, digest_algorithm, filename):
 
 def main():
     try:
-        short_options = 'pbrt:d:F:H'
-        long_options = ['parse', 'build', 'remove', 'tftp=', 'digest=', 'filename=', 'help']
+        short_options = 'pbrd:F:t:H'
+        long_options = ['parse', 'build', 'remove', 'digest=', 'filename=', 'tftp=', 'help']
 
         mode = None
         sgn_file = input_file = None
-        certificate_file = None
+        tftp_certificate_file = None
         digest_algorithm = 'sha1'
         filename = None
         help = False
@@ -465,9 +446,6 @@ def main():
             elif option in ('-r', '--remove'):
                 mode = 'remove'
 
-            elif option in ('-t', '--tftp'):
-                certificate_file = argument
-
             elif option in ('-d', '--digest'):
                 digest_algorithm = argument
 
@@ -477,19 +455,22 @@ def main():
             elif option in ('-F', '--filename'):
                 filename = argument
 
+            elif option in ('-t', '--tftp'):
+                tftp_certificate_file = argument
+
             elif option in ('-H', '--help'):
                 help = True
 
         if help:
             print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] {SGN-FILE | FILE}\n'
-                  'Parse, build or remove (unsign) .sgn files\n'
+                  'Parse, build or remove (unsign) .sgn files.\n'
                   '\n'
                   '  -p, --parse                    parse the specified .sgn file\n'
                   '  -b, --build                    build new .sgn file using options below\n'
                   '  -r, --remove                   remove (unsign) a .sgn file\n'
-                  '  -t, --tftp CERT-FILE           signing certificate with tftp role\n'
                   '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
                   '  -F, --filename NAME            file name to store in .sgn header\n'
+                  '  -t, --tftp CERT-FILE           signing/verifying certificate with tftp role\n'
                   '  -H, --help                     print this help and exit\n')
 
             return
@@ -505,7 +486,7 @@ def main():
                 raise ProgramError('No .sgn or .sha512 file specified')
 
             if mode == 'parse':
-                parse_sgn(sgn_file, certificate_file)
+                parse_sgn(sgn_file, tftp_certificate_file)
             elif mode == 'remove':
                 remove_sgn(sgn_file)
 
@@ -513,13 +494,13 @@ def main():
             if input_file is None:
                 raise ProgramError('No file specified')
 
-            if certificate_file is None:
+            if tftp_certificate_file is None:
                 raise ProgramError('No certificate .pem file specified')
 
             if filename is None:
                 filename = os.path.basename(input_file) + '.sgn'
 
-            build_sgn(input_file, certificate_file, digest_algorithm, filename)
+            build_sgn(input_file, tftp_certificate_file, digest_algorithm, filename)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)

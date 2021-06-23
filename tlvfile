@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+#
 # Copyright (c) 2020 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
@@ -16,7 +17,6 @@ import traceback
 from cryptography.exceptions import InvalidSignature
 import cryptography.hazmat.backends as backends
 import cryptography.x509 as x509
-import cryptography.x509.oid as oid
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 import cryptography.hazmat.primitives.asymmetric.rsa as rsa
@@ -44,7 +44,7 @@ HEADER_SIGNER_VERSION = 28
 RECORD_LENGTH = 1
 RECORD_DNS_NAME = 2
 RECORD_SUBJECT_NAME = 3
-RECORD_FUNCTION = 4
+RECORD_ROLE = 4
 RECORD_ISSUER_NAME = 5
 RECORD_SERIAL_NUMBER = 6
 RECORD_PUBLIC_KEY = 7
@@ -58,13 +58,13 @@ DIGEST_SHA1 = 1
 DIGEST_SHA256 = 2
 DIGEST_SHA512 = 3
 
-FUNCTION_SAST = 0
-FUNCTION_CCM = 1
-FUNCTION_CCM_TFTP = 2
-FUNCTION_TFTP = 3
-FUNCTION_CAPF = 4
-FUNCTION_HTTPS = 7
-FUNCTION_TVS = 21
+ROLE_SAST = 0
+ROLE_CCM = 1
+ROLE_CCM_TFTP = 2
+ROLE_TFTP = 3
+ROLE_CAPF = 4
+ROLE_APP_SERVER = 7
+ROLE_TVS = 21
 
 
 class ProgramError(Exception):
@@ -263,7 +263,7 @@ def parse_tlv(tlv_file):
 
         print(f'Record Length:    {record_length} bytes')
 
-        record_function = None
+        record_role = None
         record_serial_number = None
         record_certificate = None
 
@@ -287,33 +287,33 @@ def parse_tlv(tlv_file):
 
                 print(f'Subject Name:     {subject_name}')
 
-            elif tag == RECORD_FUNCTION:
+            elif tag == RECORD_ROLE:
                 if length != 2:
-                    raise ProgramError(f'Unsupported length for RECORD_FUNCTION: {length}')
+                    raise ProgramError(f'Unsupported length for RECORD_ROLE: {length}')
 
-                (function,) = struct.unpack_from('> H', tlv_data, tlv_index)
+                (role,) = struct.unpack_from('> H', tlv_data, tlv_index)
                 tlv_index += length
 
-                print(f'Function:         ', end = '')
+                print(f'Role:             ', end = '')
 
-                if function == FUNCTION_SAST:
+                if role == ROLE_SAST:
                     print('SAST')
-                elif function == FUNCTION_CCM:
+                elif role == ROLE_CCM:
                     print('CCM')
-                elif function == FUNCTION_CCM_TFTP:
+                elif role == ROLE_CCM_TFTP:
                     print('CCM+TFTP')
-                elif function == FUNCTION_TFTP:
+                elif role == ROLE_TFTP:
                     print('TFTP')
-                elif function == FUNCTION_CAPF:
+                elif role == ROLE_CAPF:
                     print('CAPF')
-                elif function == FUNCTION_HTTPS:
-                    print('HTTPS')
-                elif function == FUNCTION_TVS:
+                elif role == ROLE_APP_SERVER:
+                    print('APP-SERVER')
+                elif role == ROLE_TVS:
                     print('TVS')
                 else:
-                    print(f'{function}')
+                    print(f'{role}')
 
-                record_function = function
+                record_role = role
 
             elif tag == RECORD_ISSUER_NAME:
                 issuer_name = tlv_data[tlv_index:tlv_index + length]
@@ -365,30 +365,34 @@ def parse_tlv(tlv_file):
                 else:
                     raise ProgramError('Unsupported RECORD_CERTIFICATE type')
 
-                if header_digest_algorithm == DIGEST_SHA1:
-                    hash = hashes.SHA1()
-                elif header_digest_algorithm == DIGEST_SHA512:
-                    hash = hashes.SHA512()
-
-                certificate_hash = binascii.hexlify(certificate.fingerprint(hash)).decode('utf-8')
+                certificate_hash = certificate.fingerprint(hashes.SHA1())
+                certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
 
                 print(f'Certificate Hash: {certificate_hash}')
 
                 record_certificate = certificate
 
-            elif tag in (RECORD_IP_ADDRESS, RECORD_CERTIFICATE_HASH, RECORD_HASH_ALGORITHM):
+            elif tag == RECORD_CERTIFICATE_HASH:
+                certificate_hash = tlv_data[tlv_index:tlv_index + length]
+                tlv_index += length
+
+                certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
+
+                print(f'Certificate Hash: {certificate_hash}')
+
+            elif tag in (RECORD_HASH_ALGORITHM, RECORD_IP_ADDRESS):
                 tlv_index += length
 
             else:
                 raise ProgramError(f'Unknown RECORD tag: {tag}')
 
-        if record_function == FUNCTION_SAST and record_serial_number == header_serial_number:
+        if record_role == ROLE_SAST and record_serial_number == header_serial_number:
             header_certificate = record_certificate
 
         print('')
 
     if header_certificate is None:
-        raise ProgramError('Missing RECORD with FUNCTION_SAST')
+        raise ProgramError('Missing RECORD with ROLE_SAST')
 
     public_key = header_certificate.public_key()
 
@@ -398,10 +402,10 @@ def parse_tlv(tlv_file):
         hash = hashes.SHA512()
 
     signature = tlv_data[header_signature_index + 3:header_signature_index + 3 + header_signature_length]
-    content = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
+    tlv_data = tlv_data[:header_signature_index] + tlv_data[header_signature_index + 3 + header_signature_length:]
 
     try:
-        public_key.verify(signature, content, padding.PKCS1v15(), hash)
+        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hash)
 
     except InvalidSignature:
         print('Invalid signature')
@@ -417,33 +421,23 @@ class RSAPublicNumbers(asn1.Sequence):
     ]
 
 
-oid_names = {
-    oid.NameOID.COMMON_NAME: 'CN',
-    oid.NameOID.ORGANIZATION_NAME: 'O',
-    oid.NameOID.ORGANIZATIONAL_UNIT_NAME: 'OU',
-    oid.NameOID.LOCALITY_NAME: 'L',
-    oid.NameOID.STATE_OR_PROVINCE_NAME: 'ST',
-    oid.NameOID.COUNTRY_NAME: 'C'
-}
-
-
-def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, records):
+def build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records):
     try:
-        with open(certificate_file, 'rb') as file:
-            content = file.read()
+        with open(sast_certificate_file, 'rb') as file:
+            certificate = private_key = file.read()
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in file: {certificate_file}')
+        raise ProgramError(f'No certificate in file: {sast_certificate_file}')
 
     try:
-        private_key = serialization.load_pem_private_key(content, None, backends.default_backend())
+        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No private key in file: {certificate_file}')
+        raise ProgramError(f'No private key in file: {sast_certificate_file}')
 
     header_signature_length = private_key.key_size // 8
 
@@ -459,19 +453,13 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
     signer_name = ''
 
     for attribute in certificate.subject:
-        if attribute.oid not in oid_names:
-            continue
-
-        signer_name += (';' if len(signer_name) else '') + oid_names[attribute.oid] + '=' + attribute.value
+        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
 
     signer_name = signer_name.encode('utf-8') + b'\x00'
     ca_name = ''
 
     for attribute in certificate.issuer:
-        if attribute.oid not in oid_names:
-            continue
-
-        ca_name += (';' if len(ca_name) else '') + oid_names[attribute.oid] + '=' + attribute.value
+        ca_name += (';' if len(ca_name) else '') + attribute.rfc4514_string()
 
     ca_name = ca_name.encode('utf-8') + b'\x00'
 
@@ -532,16 +520,16 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
     header_length = len(tlv_data) + 3 + header_signature_length
     struct.pack_into('> H', tlv_data, header_length_index + 3, header_length)
 
-    for certificate_file, function in records:
+    for certificate_file, role in certificate_records:
         try:
             with open(certificate_file, 'rb') as file:
-                content = file.read()
+                certificate = file.read()
 
         except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
             raise ProgramError(f'{error.strerror}: {error.filename}')
 
         try:
-            certificate = x509.load_pem_x509_certificate(content, backends.default_backend())
+            certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
         except ValueError:
             raise ProgramError(f'No certificate in file: {certificate_file}')
 
@@ -551,42 +539,36 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
         subject_name = ''
 
         for attribute in certificate.subject:
-            if attribute.oid not in oid_names:
-                continue
-
-            subject_name += (';' if len(subject_name) else '') + oid_names[attribute.oid] + '=' + attribute.value
+            subject_name += (';' if len(subject_name) else '') + attribute.rfc4514_string()
 
         subject_name = subject_name.encode('utf-8') + b'\x00'
 
         tlv_data += struct.pack('> B H', RECORD_SUBJECT_NAME, len(subject_name))
         tlv_data += subject_name
 
-        tlv_data += struct.pack('> B H', RECORD_FUNCTION, 2)
+        tlv_data += struct.pack('> B H', RECORD_ROLE, 2)
 
-        if function == 'sast':
-            tlv_data += struct.pack('> H', FUNCTION_SAST)
-        elif function == 'ccm':
-            tlv_data += struct.pack('> H', FUNCTION_CCM)
-        elif function == 'ccm+tftp':
-            tlv_data += struct.pack('> H', FUNCTION_CCM_TFTP)
-        elif function == 'tftp':
-            tlv_data += struct.pack('> H', FUNCTION_TFTP)
-        elif function == 'capf':
-            tlv_data += struct.pack('> H', FUNCTION_CAPF)
-        elif function == 'https':
-            tlv_data += struct.pack('> H', FUNCTION_HTTPS)
-        elif function == 'tvs':
-            tlv_data += struct.pack('> H', FUNCTION_TVS)
+        if role == 'SAST':
+            tlv_data += struct.pack('> H', ROLE_SAST)
+        elif role == 'CCM':
+            tlv_data += struct.pack('> H', ROLE_CCM)
+        elif role == 'CCM+TFTP':
+            tlv_data += struct.pack('> H', ROLE_CCM_TFTP)
+        elif role == 'TFTP':
+            tlv_data += struct.pack('> H', ROLE_TFTP)
+        elif role == 'CAPF':
+            tlv_data += struct.pack('> H', ROLE_CAPF)
+        elif role == 'APP-SERVER':
+            tlv_data += struct.pack('> H', ROLE_APP_SERVER)
+        elif role == 'TVS':
+            tlv_data += struct.pack('> H', ROLE_TVS)
         else:
-            raise ProgramError(f'Unsupported RECORD_FUNCTION: {function}')
+            raise ProgramError(f'Unsupported RECORD_ROLE: {role}')
 
         issuer_name = ''
 
         for attribute in certificate.issuer:
-            if attribute.oid not in oid_names:
-                continue
-
-            issuer_name += (';' if len(issuer_name) else '') + oid_names[attribute.oid] + '=' + attribute.value
+            issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
 
         issuer_name = issuer_name.encode('utf-8') + b'\x00'
         tlv_data += struct.pack('> B H', RECORD_ISSUER_NAME, len(issuer_name)) + issuer_name
@@ -602,8 +584,10 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
         if isinstance(public_key, rsa.RSAPublicKey):
             public_numbers = public_key.public_numbers()
             public_key = RSAPublicNumbers({'n': public_numbers.n, 'e': public_numbers.e}).dump()
+
         elif isinstance(public_key, ec.EllipticCurvePublicKey):
             public_key = public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+
         else:
             raise ProgramError('Unsupported certificate PUBLIC_KEY type')
 
@@ -633,14 +617,11 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
     tlv_data = bytes(tlv_data)
     signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
 
-    content = tlv_data[:header_signature_index]
-    content += struct.pack('> B H', HEADER_SIGNATURE, len(signature))
-    content += signature
-    content += tlv_data[header_signature_index:]
-
     try:
         with open(tlv_file, 'wb') as file:
-            file.write(content)
+            file.write(tlv_data[:header_signature_index])
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
+            file.write(tlv_data[header_signature_index:])
 
     except (PermissionError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
@@ -650,18 +631,15 @@ def build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, r
 
 def main():
     try:
-        short_options = 'pbs:v:d:F:r:f:H'
-        long_options = ['parse', 'build', 'sast=', 'version=', 'digest=', 'filename=', 'record=', 'function=', 'help']
+        short_options = 'pbv:d:s:c:C:t:A:a:T:H'
+        long_options = ['parse', 'build', 'version=', 'digest=', 'filename=', 'sast=', 'ccm=', 'ccm-tftp=', 'tftp=', 'capf=', 'app-server=', 'tvs=', 'help']
 
         mode = None
         tlv_file = None
-        certificate_file = None
         version = '1.0'
         digest_algorithm = 'sha1'
         filename = None
-        record = None
-        function = None
-        records = []
+        certificate_records = []
         help = False
 
         try:
@@ -676,9 +654,6 @@ def main():
 
             elif option in ('-b', '--build'):
                 mode = 'build'
-
-            elif option in ('-s', '--sast'):
-                certificate_file = argument
 
             elif option in ('-v', '--version'):
                 version = argument
@@ -695,35 +670,53 @@ def main():
             elif option in ('-F', '--filename'):
                 filename = argument
 
-            elif option in ('-r', '--record'):
-                record = argument
+            elif option in ('-s', '--sast'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'SAST'))
 
-            elif option in ('-f', '--function'):
-                function = argument
+            elif option in ('-c', '--ccm'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'CCM'))
 
-                if function not in ('sast', 'ccm', 'tftp', 'ccm+tftp', 'https', 'tvs', 'capf'):
-                    raise ProgramError(f'Invalid function: {function}')
+            elif option in ('-C', '--ccm-tftp'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'CCM+TFTP'))
 
-                if record is None:
-                    raise ProgramError(f'No record certificate supplied for {function}')
+            elif option in ('-t', '--tftp'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'TFTP'))
 
-                records.append((record, function))
+            elif option in ('-A', '--capf'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'CAPF'))
+
+            elif option in ('-a', '--app-server'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'APP-SERVER'))
+
+            elif option in ('-T', '--tvs'):
+                certificate_file = argument
+                certificate_records.append((certificate_file, 'TVS'))
 
             elif option in ('-H', '--help'):
                 help = True
 
         if help:
             print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] TLV-FILE\n'
-                  'Parse or build .tlv files\n'
+                  'Parse or build .tlv files.\n'
                   '\n'
                   '  -p, --parse                    parse the specified .tlv file\n'
                   '  -b, --build                    build new .tlv file using options below\n'
-                  '  -s, --sast CERT-FILE           signing certificate with sast role\n'
                   '  -v, --version VERSION          signer version: 1.0 or 1.1 (default 1.0)\n'
                   '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
                   '  -F, --filename NAME            file name to store in .tlv header\n'
-                  '  -r, --record CERT-FILE         additional record certificate, can be specified more than once\n'
-                  '  -f, --function FUNCTION        function for preceeding record: sast, ccm, ccm+tftp, tftp, https, tvs or capf\n'
+                  '  -s, --sast CERT-FILE           add certificate with SAST role\n'
+                  '  -c, --ccm CERT-FILE            add certificate with CCM role\n'
+                  '  -t, --tftp CERT-FILE           add certificate with TFTP role\n'
+                  '  -C, --ccm-tftp CERT-FILE       add certificate with CCM+TFTP role\n'
+                  '  -A, --capf CERT-FILE           add certificate with CAPF role\n'
+                  '  -a, --app-server CERT-FILE     add certificate with APP-SERVER role\n'
+                  '  -T, --tvs CERT-FILE            add certificate with TVS role\n'
                   '  -H, --help                     print this help and exit\n')
 
             return
@@ -741,18 +734,18 @@ def main():
             parse_tlv(tlv_file)
 
         elif mode == 'build':
-            if certificate_file is None:
-                raise ProgramError('No certificate .pem file specified')
-
-            if not len(records):
-                raise ProgramError('No record certificates specified')
+            # First SAST certificate is used for signing
+            for certificate_file, role in certificate_records:
+                if role == 'SAST':
+                    sast_certificate_file = certificate_file
+                    break
+            else:
+                raise ProgramError('No SAST certificate .pem file specified')
 
             if filename is None:
                 filename = os.path.basename(tlv_file)
 
-            # Add the signing certificate in the SAST role
-            records.insert(0, (certificate_file, 'sast'))
-            build_tlv(tlv_file, certificate_file, version, digest_algorithm, filename, records)
+            build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)

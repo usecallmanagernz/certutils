@@ -4,8 +4,8 @@
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
-OPTIONS=$(getopt -n "${0##*/}" -o "c:o:l:s:C:e:a:b:E:y:d:f:H" \
-    -l "common:,organization:,locality:,state:,country:,email:,alternate:,bits:,curve:,years:,digest:,output:,help" -- "$@")
+OPTIONS=$(getopt -n "${0##*/}" -o "c:o:u:l:s:C:b:E:y:d:f:H" \
+    -l "common:,organization:,unit:,locality:,state:,country:,bits:,curve:,years:,digest:,output:,help" -- "$@")
 
 if [[ $? -ne 0 ]]; then
     echo "Try '${0##*/} --help' for more information"
@@ -16,11 +16,10 @@ eval set -- "$OPTIONS"
 
 COMMON_NAME=""
 ORGANIZATION=""
+ORGANIZATIONAL_UNIT=""
 LOCALITY=""
 STATE=""
 COUNTRY=""
-EMAIL_ADDRESS=""
-ALTERNATE_NAMES=()
 BITS="2048"
 CURVE=""
 YEARS="10"
@@ -38,8 +37,12 @@ while true; do
         COMMON_NAME="$1"
         shift 1
         ;;
-    -O|--organization)
+    -o|--organization)
         ORGANIZATION="$1"
+        shift 1
+        ;;
+    -u|--unit)
+        ORGANIZATIONAL_UNIT="$1"
         shift 1
         ;;
     -l|--locality)
@@ -58,26 +61,6 @@ while true; do
             echo "Invalid country: $COUNTRY" >&2
             exit 1
         fi
-        ;;
-    -e|--email)
-        EMAIL_ADDRESS="$1"
-        shift 1
-
-        if [[ ! $EMAIL_ADDRESS =~ ^[a-zA-Z0-9\+\'\.\-]+@([a-zA-Z0-9]+\.)+[a-zA-Z0-9\-]+$ ]]; then
-            echo "Invalid email: $EMAIL_ADDRESS" >&2
-            exit 1
-        fi
-        ;;
-    -a|--alternate)
-        ALTERNATE_NAME="$1"
-        shift 1
-
-        if [[ ! $ALTERNATE_NAME =~ ^([a-z0-9\-]+\.)*[a-z0-9\-]+$ ]]; then
-            echo "Invalid alternate name: $ALTERNATE_NAME" >&2
-            exit 1
-        fi
-
-        ALTERNATE_NAMES+=("$1")
         ;;
     -b|--bits)
         BITS="$1"
@@ -115,21 +98,20 @@ while true; do
         shift 1
         ;;
     -H|--help)
-        echo "Usage: ${0##*/} [OPTIONS] [COMMON-NAME]"
-        echo "Create a self-signed X509 certificate"
+        echo "Usage: ${0##*/} [OPTIONS] [PEM-FILE]"
+        echo "Create a self-signed X509 certificate."
         echo ""
         echo "  -c, --common COMMON-NAME           common name"
+        echo "  -u, --unit UNIT                    organizational unit"
         echo "  -o, --organization ORGANIZATION    organization"
         echo "  -l, --locality LOCALITY            locality"
         echo "  -s, --state STATE                  state or province"
         echo "  -C, --country COUNTRY              country code"
-        echo "  -a, --alternate DNS-NAME           alternate DNS name, can be specified more than once"
-        echo "  -e, --email EMAIL                  email address"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
         echo "  -E, --curve CURVE                  generate an EC key using curve instead of an RSA key"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
-        echo "  -f, --file PEM-FILE                output .pem file"
+        echo "  -f, --file PEM-FILE                output .pem file (default COMMON-NAME.pem)"
         echo "  -h, --help                         print this help and exit"
         echo ""
 
@@ -142,22 +124,22 @@ while true; do
 done
 
 if [[ -z $COMMON_NAME ]]; then
-    COMMON_NAME="$1"
-
-    if [[ -z $COMMON_NAME ]]; then
-        echo "No common name specified"
-        exit 1
-    fi
+    echo "No common name specified" >&2
+    exit 1
 fi
 
 if [[ -z $OUTPUT_FILE ]]; then
-    OUTPUT_FILE=$(echo "$COMMON_NAME" | sed -e "s/[^A-Za-z0-9\.\-]/_/g").pem
+    OUTPUT_FILE="$1"
+
+    if [[ -z $OUTPUT_FILE ]]; then
+        OUTPUT_FILE=$(echo "$COMMON_NAME" | sed -e "s/[^A-Za-z0-9\.\-]/_/g").pem
+    fi
 fi
 
 START_DATE=$(date -u -d "now" +"%Y%m%d000000Z")
 END_DATE=$(date -u -d "now + $YEARS years" +"%Y%m%d000000Z")
 
-TEMP_DIR=$(mktemp -d /tmp/gencert-XXXXXXXX) || exit 1
+TEMP_DIR=$(mktemp -d /tmp/mkcert-XXXXXXXX) || exit 1
 
 trap "rm -rf $TEMP_DIR" EXIT
 touch "$TEMP_DIR/random" "$TEMP_DIR/database.txt" "$TEMP_DIR/database.txt.attr"
@@ -186,19 +168,18 @@ preserve = no
 unique_subject = no
 
 [x509_extensions]
-basicConstraints = CA:true, pathlen:0
 keyUsage = Certificate Sign, Digital Signature, Key Encipherment, Data Encipherment
 extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication
 subjectKeyIdentifier = hash
-${ALTERNATE_NAMES[@]:+subjectAltName = @alternate_names}
+basicConstraints = critical, CA:true, pathlen:0
 
 [policy_default]
 commonName = supplied
+organizationalUnitName = optional
 organizationName = optional
 localityName = optional
 stateOrProvinceName = optional
 countryName = optional
-emailAddress = optional
 
 [req]
 req_extensions = x509_extensions
@@ -209,45 +190,39 @@ prompt = no
 [distinguished_name]
 commonName = $COMMON_NAME
 ${ORGANIZATION:+organizationName = $ORGANIZATION}
+${ORGANIZATIONAL_UNIT:+organizationalUnitName = $ORGANIZATIONAL_UNIT}
 ${LOCALITY:+localityName = $LOCALITY}
-${STATE:+stateOrProviceName = $STATE}
+${STATE:+stateOrProvinceName = $STATE}
 ${COUNTRY:+countryName = $COUNTRY}
-${EMAIL_ADDRESS:+emailAddress = $EMAIL_ADDRESS}
-
-[alternate_names]
 EOF
-
-for (( INDEX=0; INDEX < ${#ALTERNATE_NAMES[@]}; INDEX++ )); do
-    echo "DNS.$INDEX = ${ALTERNATE_NAME[$INDEX]}" >> "$TEMP_DIR/openssl.cnf"
-done
 
 if [[ -n $CURVE ]]; then
     if ! openssl ecparam -name "$CURVE" -noout 2> /dev/null; then
-        echo "Invalid curve: $CURVE"
+        echo "Invalid curve: $CURVE" >&2
         exit 1
     fi
 
     if ! openssl ecparam -name "$CURVE" -genkey -noout \
          -out "$TEMP_DIR/key.pem" 2> /dev/null; then
-        echo "Error while generaing EC key"
+        echo "Error while generaing EC key" >&2
         exit 1
     fi
 else
     if ! openssl genrsa -out "$TEMP_DIR/key.pem" "$BITS" 2> /dev/null; then
-        echo "Error while generating RSA key"
+        echo "Error while generating RSA key" >&2
         exit 1
     fi
 fi
 
 if ! openssl req -config "$TEMP_DIR/openssl.cnf" -new -batch \
      -key "$TEMP_DIR/key.pem" -out "$TEMP_DIR/req.pem"; then
-    echo "Error while creating signing request"
+    echo "Error while creating signing request" >&2
     exit 1
 fi
 
 if ! openssl ca -config "$TEMP_DIR/openssl.cnf" -notext -selfsign -batch \
      -in "$TEMP_DIR/req.pem" -out "$TEMP_DIR/crt.pem" 2> /dev/null; then
-    echo "Error while signing CA certificate"
+    echo "Error while signing CA certificate" >&2
     exit 1
 fi
 

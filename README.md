@@ -4,8 +4,8 @@
 
 Utilities to manage .tlv and .sgn files.
 
-* `tlvfile` - Parse or create .tlv files (eg: ITLFile.tlv).
-* `sgnfile` - Parse or create .sgn files.
+* `tlvfile` - Parse or build .tlv files (eg: ITLFile.tlv).
+* `sgnfile` - Parse or build .sgn files.
 * `stripsgn` - Remove .sgn header from a firmware file.
 * `certhash` - Hash an x509 certificate and output as base64.
 * `mkcert` - Make self-signed X509 certificates.
