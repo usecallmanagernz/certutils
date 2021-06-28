@@ -1,4 +1,4 @@
-[![python lint](https://github.com/usecallmanagernz/certutils/actions/workflows/pylint.yml/badge.svg?branch=master)](https://github.com/usecallmanagernz/certutils/actions/workflows/pylint.yml) [![shell lint](https://github.com/usecallmanagernz/certutils/actions/workflows/shellcheck.yml/badge.svg?branch=master)](https://github.com/usecallmanagernz/certutils/actions/workflows/shellcheck.yml) ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/usecallmanagernz/certutils?color=blue&label=version&sort=semver)
+![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/usecallmanagernz/certutils/python%20lint/master?label=python%20lint) ![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/usecallmanagernz/certutils/shell%20lint/master?label=shell%20lint) ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/usecallmanagernz/certutils?color=blue&label=version&sort=semver)
 
 # Certificate Utilities
 
