@@ -30,29 +30,29 @@ def strip_sgn(sgn_file):
 
     tlv_index = 0
 
-    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
     tlv_index += 3
 
-    if tag != HEADER_VERSION:
-        raise ProgramError(f'Tag is not HEADER_VERSION: {tag}')
+    if tlv_tag != HEADER_VERSION:
+        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    if length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_VERSION: {length}')
+    if tlv_length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_VERSION: {tlv_length}')
 
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
-    tlv_index += length
+    tlv_index += tlv_length
 
-    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
     tlv_index += 3
 
-    if tag != HEADER_LENGTH:
-        raise ProgramError(f'Tag is not HEADER_LENGTH: {tag}')
+    if tlv_tag != HEADER_LENGTH:
+        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
 
-    if length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {length}')
+    if tlv_length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {tlv_length}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
-    tlv_index += length
+    tlv_index += tlv_length
 
     # Remove .sgn or .sha512
     if sgn_file.endswith('.sgn'):

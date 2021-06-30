@@ -81,32 +81,32 @@ def parse_tlv(tlv_file):
 
     tlv_index = 0
 
-    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
     tlv_index += 3
 
-    if tag != HEADER_VERSION:
-        raise ProgramError(f'Tag is not HEADER_VERSION: {tag}')
+    if tlv_tag != HEADER_VERSION:
+        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    if length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_VERSION: {length}')
+    if tlv_length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_VERSION: {tlv_length}')
 
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
-    tlv_index += length
+    tlv_index += tlv_length
 
     version = f'{major}.{minor}'
     print(f'Version:          {version}')
 
-    (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
     tlv_index += 3
 
-    if tag != HEADER_LENGTH:
-        raise ProgramError(f'Tag is not HEADER_LENGTH: {tag}')
+    if tlv_tag != HEADER_LENGTH:
+        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
 
-    if length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {length}')
+    if tlv_length != 2:
+        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {tlv_length}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
-    tlv_index += length
+    tlv_index += tlv_length
 
     print(f'Header Length:    {header_length} bytes')
 
@@ -118,62 +118,51 @@ def parse_tlv(tlv_file):
     header_signature_length = 0
 
     while tlv_index < header_length:
-        (tag,) = struct.unpack_from('B', tlv_data, tlv_index)
+        (tlv_tag,) = struct.unpack_from('B', tlv_data, tlv_index)
         tlv_index += 1
 
-        if tag == HEADER_PADDING:
+        if tlv_tag == HEADER_PADDING:
             continue
 
-        (length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+        (tlv_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
         tlv_index += 2
 
-        if tag == HEADER_SIGNER_VERSION:
-            if length != 2:
-                raise ProgramError(f'Unsupported length for HEADER_SIGNER_VERSION: {length}')
+        if tlv_tag in (HEADER_SIGNER_ID, HEADER_SIGNATURE_INFO, HEADER_SIGNATURE_ALGORITHM_INFO):
+            continue
+
+        if tlv_tag == HEADER_SIGNER_VERSION:
+            if tlv_length != 2:
+                raise ProgramError(f'Unsupported length for HEADER_SIGNER_VERSION: {tlv_length}')
 
             (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
-            tlv_index += length
 
             print(f'Signer Version:   {major}.{minor}')
 
-        elif tag == HEADER_SIGNER_ID:
-            continue
-
-        elif tag == HEADER_SIGNER_NAME:
-            signer_name = tlv_data[tlv_index:tlv_index + length]
-            tlv_index += length
-
+        elif tlv_tag == HEADER_SIGNER_NAME:
+            signer_name = tlv_data[tlv_index:tlv_index + tlv_length]
             signer_name = signer_name[:-1].decode('utf-8')
 
             print(f'Signer Name:      {signer_name}')
 
-        elif tag == HEADER_SERIAL_NUMBER:
-            serial_number = binascii.hexlify(tlv_data[tlv_index:tlv_index + length])
-            tlv_index += length
-
+        elif tlv_tag == HEADER_SERIAL_NUMBER:
+            serial_number = binascii.hexlify(tlv_data[tlv_index:tlv_index + tlv_length])
             serial_number = serial_number.decode('utf-8')
 
             print(f'Serial Number:    {serial_number}')
 
             header_serial_number = serial_number
 
-        elif tag == HEADER_CA_NAME:
-            ca_name = tlv_data[tlv_index:tlv_index + length]
-            tlv_index += length
-
+        elif tlv_tag == HEADER_CA_NAME:
+            ca_name = tlv_data[tlv_index:tlv_index + tlv_length]
             ca_name = ca_name[:-1].decode('utf-8')
 
             print(f'CA Name:          {ca_name}')
 
-        elif tag == HEADER_SIGNATURE_INFO:
-            continue
-
-        elif tag == HEADER_DIGEST_ALGORITHM:
-            if length != 1:
-                raise ProgramError(f'Unsupported length for HEADER_DIGEST_ALGORITHM: {length}')
+        elif tlv_tag == HEADER_DIGEST_ALGORITHM:
+            if tlv_length != 1:
+                raise ProgramError(f'Unsupported length for HEADER_DIGEST_ALGORITHM: {tlv_length}')
 
             (digest_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
-            tlv_index += length
 
             print(f'Digest Algorithm: ', end = '')
 
@@ -186,51 +175,36 @@ def parse_tlv(tlv_file):
 
             header_digest_algorithm = digest_algorithm
 
-        elif tag == HEADER_SIGNATURE_ALGORITHM_INFO:
-            continue
+        elif tlv_tag in (HEADER_SIGNATURE_ALGORITHM, HEADER_SIGNATURE_MODULUS):
+            pass
 
-        elif tag == HEADER_SIGNATURE_ALGORITHM:
-            if length != 1:
-                raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_ALGORITHM: {length}')
+        elif tlv_tag == HEADER_SIGNATURE:
+            signature = tlv_data[tlv_index:tlv_index + tlv_length]
 
-            tlv_index += length
+            print(f'Signature:        {tlv_length} bytes')
 
-        elif tag == HEADER_SIGNATURE_MODULUS:
-            if length != 1:
-                raise ProgramError(f'Unsupported length for HEADER_SIGNATURE_MODULUS: {length}')
+            header_signature_index = tlv_index - 3
+            header_signature_length = tlv_length
 
-            tlv_index += length
-
-        elif tag == HEADER_SIGNATURE:
-            signature = tlv_data[tlv_index:tlv_index + length]
-            tlv_index += length
-
-            print(f'Signature:        {length} bytes')
-
-            header_signature_index = tlv_index - 3 - length
-            header_signature_length = length
-
-        elif tag == HEADER_FILENAME:
-            filename = tlv_data[tlv_index:tlv_index + length]
-            tlv_index += length
-
+        elif tlv_tag == HEADER_FILENAME:
+            filename = tlv_data[tlv_index:tlv_index + tlv_length]
             filename = filename[:-1].decode('utf-8')
 
             print(f'Filename:         {filename}')
 
-        elif tag == HEADER_TIMESTAMP:
-            if length != 4:
-                raise ProgramError(f'Unsupported length for HEADER_TIMESTAMP: {length}')
+        elif tlv_tag == HEADER_TIMESTAMP:
+            if tlv_length != 4:
+                raise ProgramError(f'Unsupported length for HEADER_TIMESTAMP: {tlv_length}')
 
             (timestamp,) = struct.unpack_from('> I', tlv_data, tlv_index)
-            tlv_index += length
-
             timestamp = datetime.fromtimestamp(timestamp)
 
             print(timestamp.strftime('Timestamp:        %Y-%m-%d %H:%M:%S'))
 
         else:
-            raise ProgramError(f'Unknown HEADER tag: {tag}')
+            raise ProgramError(f'Unknown HEADER tag: {tlv_tag}')
+
+        tlv_index += tlv_length
 
     print('')
 
@@ -249,17 +223,17 @@ def parse_tlv(tlv_file):
     while tlv_index < len(tlv_data):
         record_index = tlv_index
 
-        (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+        (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
         tlv_index += 3
 
-        if tag != RECORD_LENGTH:
-            raise ProgramError(f'Tag is not RECORD_LENGTH: {tag}')
+        if tlv_tag != RECORD_LENGTH:
+            raise ProgramError(f'Tag is not RECORD_LENGTH: {tlv_tag}')
 
-        if length != 2:
-            raise ProgramError(f'Unsupported length for RECORD_LENGTH: {length}')
+        if tlv_length != 2:
+            raise ProgramError(f'Unsupported length for RECORD_LENGTH: {tlv_length}')
 
         (record_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
-        tlv_index += length
+        tlv_index += tlv_length
 
         print(f'Record Length:    {record_length} bytes')
 
@@ -268,31 +242,26 @@ def parse_tlv(tlv_file):
         record_certificate = None
 
         while tlv_index < record_index + record_length:
-            (tag, length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+            (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
             tlv_index += 3
 
-            if tag == RECORD_DNS_NAME:
-                dns_name = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
-
+            if tlv_tag == RECORD_DNS_NAME:
+                dns_name = tlv_data[tlv_index:tlv_index + tlv_length]
                 dns_name = dns_name[:-1].decode('utf-8')
 
                 print(f'DNS Name:         {dns_name}')
 
-            elif tag == RECORD_SUBJECT_NAME:
-                subject_name = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
-
+            elif tlv_tag == RECORD_SUBJECT_NAME:
+                subject_name = tlv_data[tlv_index:tlv_index + tlv_length]
                 subject_name = subject_name[:-1].decode('utf-8')
 
                 print(f'Subject Name:     {subject_name}')
 
-            elif tag == RECORD_ROLE:
-                if length != 2:
-                    raise ProgramError(f'Unsupported length for RECORD_ROLE: {length}')
+            elif tlv_tag == RECORD_ROLE:
+                if tlv_length != 2:
+                    raise ProgramError(f'Unsupported length for RECORD_ROLE: {tlv_length}')
 
                 (role,) = struct.unpack_from('> H', tlv_data, tlv_index)
-                tlv_index += length
 
                 print(f'Role:             ', end = '')
 
@@ -315,41 +284,34 @@ def parse_tlv(tlv_file):
 
                 record_role = role
 
-            elif tag == RECORD_ISSUER_NAME:
-                issuer_name = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
-
+            elif tlv_tag == RECORD_ISSUER_NAME:
+                issuer_name = tlv_data[tlv_index:tlv_index + tlv_length]
                 issuer_name = issuer_name[:-1].decode('utf-8')
 
                 print(f'Issuer Name:      {issuer_name}')
 
-            elif tag == RECORD_SERIAL_NUMBER:
-                serial_number = binascii.hexlify(tlv_data[tlv_index:tlv_index + length])
-                tlv_index += length
-
+            elif tlv_tag == RECORD_SERIAL_NUMBER:
+                serial_number = binascii.hexlify(tlv_data[tlv_index:tlv_index + tlv_length])
                 serial_number = serial_number.decode('utf-8')
 
                 print(f'Serial Numer:     {serial_number}')
 
                 record_serial_number = serial_number
 
-            elif tag == RECORD_PUBLIC_KEY:
-                public_key = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
+            elif tlv_tag == RECORD_PUBLIC_KEY:
+                public_key = tlv_data[tlv_index:tlv_index + tlv_length]
 
-                print(f'Public Key:       {length} bytes')
+                print(f'Public Key:       {tlv_length} bytes')
 
-            elif tag == RECORD_SIGNATURE:
-                signature = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
+            elif tlv_tag == RECORD_SIGNATURE:
+                signature = tlv_data[tlv_index:tlv_index + tlv_length]
 
-                print(f'Signature:        {length} bytes')
+                print(f'Signature:        {tlv_length} bytes')
 
-            elif tag == RECORD_CERTIFICATE:
-                certificate = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
+            elif tlv_tag == RECORD_CERTIFICATE:
+                certificate = tlv_data[tlv_index:tlv_index + tlv_length]
 
-                print(f'Certificate:      {length} bytes')
+                print(f'Certificate:      {tlv_length} bytes')
 
                 try:
                     certificate = x509.load_der_x509_certificate(certificate, backends.default_backend())
@@ -372,19 +334,19 @@ def parse_tlv(tlv_file):
 
                 record_certificate = certificate
 
-            elif tag == RECORD_CERTIFICATE_HASH:
-                certificate_hash = tlv_data[tlv_index:tlv_index + length]
-                tlv_index += length
-
+            elif tlv_tag == RECORD_CERTIFICATE_HASH:
+                certificate_hash = tlv_data[tlv_index:tlv_index + tlv_length]
                 certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
 
                 print(f'Certificate Hash: {certificate_hash}')
 
-            elif tag in (RECORD_HASH_ALGORITHM, RECORD_IP_ADDRESS):
-                tlv_index += length
+            elif tlv_tag in (RECORD_HASH_ALGORITHM, RECORD_IP_ADDRESS):
+                pass
 
             else:
-                raise ProgramError(f'Unknown RECORD tag: {tag}')
+                raise ProgramError(f'Unknown RECORD tag: {tlv_tag}')
+
+            tlv_index += tlv_length
 
         if record_role == ROLE_SAST and record_serial_number == header_serial_number:
             header_certificate = record_certificate
@@ -406,12 +368,10 @@ def parse_tlv(tlv_file):
 
     try:
         public_key.verify(signature, tlv_data, padding.PKCS1v15(), hash)
-
     except InvalidSignature:
         print('Invalid signature')
-        return
-
-    print('Valid signature')
+    else:
+        print('Valid signature')
 
 
 class RSAPublicNumbers(asn1.Sequence):
