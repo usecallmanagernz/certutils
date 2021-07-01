@@ -30,7 +30,7 @@ jobs:
 
       - name: Install packages
         run: |
-          sudo apt install pylint python3-cryptography python3-asn1crypto
+          sudo apt install pylint python3-cryptography
 
       - name: Run pylint 
         run: |
