@@ -14,9 +14,9 @@ import time
 import getopt
 import traceback
 
+from cryptography import x509
 from cryptography.exceptions import InvalidSignature
-import cryptography.hazmat.backends as backends
-import cryptography.x509 as x509
+from cryptography.hazmat import backends
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
