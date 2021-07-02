@@ -15,8 +15,7 @@ example usage.
 
 ## Requirements
 
-The following non-standard Python modules are required: `crytography` and
-`asn1crypto`.
+The following non-standard Python modules are required: `crytography`.
 
 You can use the packages provided by your OS distribution or run
 `sudo pip3 install -r requirements.txt` to satisfy those dependancies.

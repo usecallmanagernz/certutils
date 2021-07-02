@@ -587,6 +587,7 @@ def main():
         digest_algorithm = 'sha1'
         filename = None
         certificate_records = []
+        sast_certificate_file = None
         help = False
 
         try:
@@ -620,6 +621,10 @@ def main():
             elif option in ('-s', '--sast'):
                 certificate_file = argument
                 certificate_records.append((certificate_file, 'SAST'))
+
+                # First SAST certificate is used for signing
+                if sast_certificate_file is None:
+                    sast_certificate_file = certificate_file
 
             elif option in ('-c', '--ccm'):
                 certificate_file = argument
@@ -681,16 +686,11 @@ def main():
             parse_tlv(tlv_file)
 
         elif mode == 'build':
-            # First SAST certificate is used for signing
-            for certificate_file, role in certificate_records:
-                if role == 'SAST':
-                    sast_certificate_file = certificate_file
-                    break
-            else:
-                raise ProgramError('No SAST certificate .pem file specified')
-
             if filename is None:
                 filename = os.path.basename(tlv_file)
+
+            if sast_certificate_file is None:
+                raise ProgramError('No SAST certificate .pem file specified')
 
             build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records)
 
