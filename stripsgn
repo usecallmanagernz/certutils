@@ -20,7 +20,7 @@ class ProgramError(Exception):
     pass
 
 
-def strip_sgn(sgn_file):
+def strip_sgn_file(sgn_file):
     try:
         with open(sgn_file, 'rb') as file:
             tlv_data = file.read()
@@ -36,9 +36,6 @@ def strip_sgn(sgn_file):
     if tlv_tag != HEADER_VERSION:
         raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_VERSION: {tlv_length}')
-
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
     tlv_index += tlv_length
 
@@ -47,9 +44,6 @@ def strip_sgn(sgn_file):
 
     if tlv_tag != HEADER_LENGTH:
         raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
-
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {tlv_length}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -107,7 +101,7 @@ def main():
         if not sgn_file.endswith(('.sgn', '.sha512')):
             raise ProgramError(f'File {sgn_file} does not end with .sgn or .sha512')
 
-        strip_sgn(sgn_file)
+        strip_sgn_file(sgn_file)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)

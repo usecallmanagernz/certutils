@@ -26,7 +26,7 @@ HEADER_LENGTH = 2
 HEADER_SIGNER_ID = 3
 HEADER_SIGNER_NAME = 4
 HEADER_SERIAL_NUMBER = 5
-HEADER_CA_NAME = 6
+HEADER_ISSUER_NAME = 6
 HEADER_SIGNATURE_INFO = 7
 HEADER_DIGEST_ALGORITHM = 8
 HEADER_SIGNATURE_ALGORITHM_INFO = 9
@@ -46,7 +46,7 @@ class ProgramError(Exception):
     pass
 
 
-def parse_sgn(sgn_file, tftp_certificate_file):
+def parse_sgn_file(sgn_file, tftp_certificate_file):
     try:
         with open(sgn_file, 'rb') as file:
             tlv_data = file.read()
@@ -62,9 +62,6 @@ def parse_sgn(sgn_file, tftp_certificate_file):
     if tlv_tag != HEADER_VERSION:
         raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_VERSION: {tlv_length}')
-
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
     tlv_index += tlv_length
 
@@ -76,9 +73,6 @@ def parse_sgn(sgn_file, tftp_certificate_file):
 
     if tlv_tag != HEADER_LENGTH:
         raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
-
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {tlv_length}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -114,16 +108,13 @@ def parse_sgn(sgn_file, tftp_certificate_file):
 
             print(f'Serial Number:    {serial_number}')
 
-        elif tlv_tag == HEADER_CA_NAME:
-            ca_name = tlv_data[tlv_index:tlv_index + tlv_length]
-            ca_name = ca_name[:-1].decode('utf-8')
+        elif tlv_tag == HEADER_ISSUER_NAME:
+            issuer_name = tlv_data[tlv_index:tlv_index + tlv_length]
+            issuer_name = issuer_name[:-1].decode('utf-8')
 
-            print(f'CA Name:          {ca_name}')
+            print(f'Issuer Name:      {issuer_name}')
 
         elif tlv_tag == HEADER_DIGEST_ALGORITHM:
-            if tlv_length != 1:
-                raise ProgramError(f'Unsupported length for HEADER_DIGEST_ALGORITHM: {tlv_length}')
-
             (digest_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
 
             print(f'Digest Algorithm: ', end = '')
@@ -157,9 +148,6 @@ def parse_sgn(sgn_file, tftp_certificate_file):
             print(f'Filename:         {filename}')
 
         elif tlv_tag == HEADER_TIMESTAMP:
-            if tlv_length != 4:
-                raise ProgramError(f'Unsupported length for HEADER_TIMESTAMP: {tlv_length}')
-
             (timestamp,) = struct.unpack_from('> I', tlv_data, tlv_index)
             timestamp = datetime.fromtimestamp(timestamp)
 
@@ -215,7 +203,7 @@ def parse_sgn(sgn_file, tftp_certificate_file):
         print('Valid signature')
 
 
-def remove_sgn(sgn_file):
+def remove_sgn_file(sgn_file):
     try:
         with open(sgn_file, 'rb') as file:
             tlv_data = file.read()
@@ -231,9 +219,6 @@ def remove_sgn(sgn_file):
     if tlv_tag != HEADER_VERSION:
         raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_VERSION: {tlv_length}')
-
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
     tlv_index += tlv_length
 
@@ -242,9 +227,6 @@ def remove_sgn(sgn_file):
 
     if tlv_tag != HEADER_LENGTH:
         raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
-
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {tlv_length}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -267,7 +249,7 @@ def remove_sgn(sgn_file):
     print(f'Wrote {output_file}')
 
 
-def build_sgn(input_file, tftp_certificate_file, digest_algorithm, filename):
+def build_sgn_file(input_file, tftp_certificate_file, digest_algorithm, filename):
     try:
         with open(tftp_certificate_file, 'rb') as file:
             certificate = private_key = file.read()
@@ -299,17 +281,17 @@ def build_sgn(input_file, tftp_certificate_file, digest_algorithm, filename):
         signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
 
     signer_name = signer_name.encode('utf-8') + b'\x00'
-    ca_name = ''
+    issuer_name = ''
 
     for attribute in certificate.issuer:
-        ca_name += (';' if len(ca_name) else '') + attribute.rfc4514_string()
+        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
 
-    ca_name = ca_name.encode('utf-8') + b'\x00'
+    issuer_name = issuer_name.encode('utf-8') + b'\x00'
 
     serial_number = certificate.serial_number
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-    signer_id = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(ca_name)
+    signer_id = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(issuer_name)
     tlv_data += struct.pack('> B H', HEADER_SIGNER_ID, signer_id)
 
     tlv_data += struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
@@ -318,8 +300,8 @@ def build_sgn(input_file, tftp_certificate_file, digest_algorithm, filename):
     tlv_data += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
     tlv_data += serial_number
 
-    tlv_data += struct.pack('> B H', HEADER_CA_NAME, len(ca_name))
-    tlv_data += ca_name
+    tlv_data += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
+    tlv_data += issuer_name
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H', HEADER_DIGEST_ALGORITHM, 1)
@@ -461,9 +443,9 @@ def main():
                 raise ProgramError('No .sgn or .sha512 file specified')
 
             if mode == 'parse':
-                parse_sgn(sgn_file, tftp_certificate_file)
+                parse_sgn_file(sgn_file, tftp_certificate_file)
             elif mode == 'remove':
-                remove_sgn(sgn_file)
+                remove_sgn_file(sgn_file)
 
         elif mode == 'build':
             if input_file is None:
@@ -475,7 +457,7 @@ def main():
             if filename is None:
                 filename = os.path.basename(input_file) + '.sgn'
 
-            build_sgn(input_file, tftp_certificate_file, digest_algorithm, filename)
+            build_sgn_file(input_file, tftp_certificate_file, digest_algorithm, filename)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)

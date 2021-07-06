@@ -26,7 +26,7 @@ HEADER_LENGTH = 2
 HEADER_SIGNER_ID = 3
 HEADER_SIGNER_NAME = 4
 HEADER_SERIAL_NUMBER = 5
-HEADER_CA_NAME = 6
+HEADER_ISSUER_NAME = 6
 HEADER_SIGNATURE_INFO = 7
 HEADER_DIGEST_ALGORITHM = 8
 HEADER_SIGNATURE_ALGORITHM_INFO = 9
@@ -68,7 +68,7 @@ class ProgramError(Exception):
     pass
 
 
-def parse_tlv(tlv_file):
+def parse_tlv_file(tlv_file):
     try:
         with open(tlv_file, 'rb') as file:
             tlv_data = file.read()
@@ -84,9 +84,6 @@ def parse_tlv(tlv_file):
     if tlv_tag != HEADER_VERSION:
         raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_VERSION: {tlv_length}')
-
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
     tlv_index += tlv_length
 
@@ -98,9 +95,6 @@ def parse_tlv(tlv_file):
 
     if tlv_tag != HEADER_LENGTH:
         raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
-
-    if tlv_length != 2:
-        raise ProgramError(f'Unsupported length for HEADER_LENGTH: {tlv_length}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -128,9 +122,6 @@ def parse_tlv(tlv_file):
             continue
 
         if tlv_tag == HEADER_SIGNER_VERSION:
-            if tlv_length != 2:
-                raise ProgramError(f'Unsupported length for HEADER_SIGNER_VERSION: {tlv_length}')
-
             (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
 
             print(f'Signer Version:   {major}.{minor}')
@@ -149,16 +140,13 @@ def parse_tlv(tlv_file):
 
             header_serial_number = serial_number
 
-        elif tlv_tag == HEADER_CA_NAME:
-            ca_name = tlv_data[tlv_index:tlv_index + tlv_length]
-            ca_name = ca_name[:-1].decode('utf-8')
+        elif tlv_tag == HEADER_ISSUER_NAME:
+            issuer_name = tlv_data[tlv_index:tlv_index + tlv_length]
+            issuer_name = issuer_name[:-1].decode('utf-8')
 
-            print(f'CA Name:          {ca_name}')
+            print(f'Issuer Name:      {issuer_name}')
 
         elif tlv_tag == HEADER_DIGEST_ALGORITHM:
-            if tlv_length != 1:
-                raise ProgramError(f'Unsupported length for HEADER_DIGEST_ALGORITHM: {tlv_length}')
-
             (digest_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
 
             print(f'Digest Algorithm: ', end = '')
@@ -190,9 +178,6 @@ def parse_tlv(tlv_file):
             print(f'Filename:         {filename}')
 
         elif tlv_tag == HEADER_TIMESTAMP:
-            if tlv_length != 4:
-                raise ProgramError(f'Unsupported length for HEADER_TIMESTAMP: {tlv_length}')
-
             (timestamp,) = struct.unpack_from('> I', tlv_data, tlv_index)
             timestamp = datetime.fromtimestamp(timestamp)
 
@@ -226,9 +211,6 @@ def parse_tlv(tlv_file):
         if tlv_tag != RECORD_LENGTH:
             raise ProgramError(f'Tag is not RECORD_LENGTH: {tlv_tag}')
 
-        if tlv_length != 2:
-            raise ProgramError(f'Unsupported length for RECORD_LENGTH: {tlv_length}')
-
         (record_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
         tlv_index += tlv_length
 
@@ -255,9 +237,6 @@ def parse_tlv(tlv_file):
                 print(f'Subject Name:     {subject_name}')
 
             elif tlv_tag == RECORD_ROLE:
-                if tlv_length != 2:
-                    raise ProgramError(f'Unsupported length for RECORD_ROLE: {tlv_length}')
-
                 (role,) = struct.unpack_from('> H', tlv_data, tlv_index)
 
                 print(f'Role:             ', end = '')
@@ -371,7 +350,7 @@ def parse_tlv(tlv_file):
         print('Valid signature')
 
 
-def build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records):
+def build_tlv_file(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records):
     try:
         with open(sast_certificate_file, 'rb') as file:
             certificate = private_key = file.read()
@@ -406,17 +385,17 @@ def build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filena
         signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
 
     signer_name = signer_name.encode('utf-8') + b'\x00'
-    ca_name = ''
+    issuer_name = ''
 
     for attribute in certificate.issuer:
-        ca_name += (';' if len(ca_name) else '') + attribute.rfc4514_string()
+        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
 
-    ca_name = ca_name.encode('utf-8') + b'\x00'
+    issuer_name = issuer_name.encode('utf-8') + b'\x00'
 
     serial_number = certificate.serial_number
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-    signer_id = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(ca_name)
+    signer_id = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(issuer_name)
     tlv_data += struct.pack('> B H', HEADER_SIGNER_ID, signer_id)
 
     tlv_data += struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
@@ -425,8 +404,8 @@ def build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filena
     tlv_data += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
     tlv_data += serial_number
 
-    tlv_data += struct.pack('> B H', HEADER_CA_NAME, len(ca_name))
-    tlv_data += ca_name
+    tlv_data += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
+    tlv_data += issuer_name
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H', HEADER_DIGEST_ALGORITHM, 1)
@@ -683,7 +662,7 @@ def main():
             raise ProgramError('No .tlv file specified')
 
         if mode == 'parse':
-            parse_tlv(tlv_file)
+            parse_tlv_file(tlv_file)
 
         elif mode == 'build':
             if filename is None:
@@ -692,7 +671,7 @@ def main():
             if sast_certificate_file is None:
                 raise ProgramError('No SAST certificate .pem file specified')
 
-            build_tlv(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records)
+            build_tlv_file(tlv_file, sast_certificate_file, version, digest_algorithm, filename, certificate_records)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)
