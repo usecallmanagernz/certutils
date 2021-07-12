@@ -101,9 +101,9 @@ while true; do
         echo "Usage: ${0##*/} [OPTIONS] [PEM-FILE]"
         echo "Create a self-signed X509 certificate."
         echo ""
-        echo "  -c, --common COMMON-NAME           common name"
+        echo "  -c, --common COMMON-NAME           common name, required"
+        echo "  -o, --organization ORGANIZATION    organization, required"
         echo "  -u, --unit UNIT                    organizational unit"
-        echo "  -o, --organization ORGANIZATION    organization"
         echo "  -l, --locality LOCALITY            locality"
         echo "  -s, --state STATE                  state or province"
         echo "  -C, --country COUNTRY              country code"
@@ -125,6 +125,11 @@ done
 
 if [[ -z $COMMON_NAME ]]; then
     echo "No common name specified" >&2
+    exit 1
+fi
+
+if [[ -z $ORGANIZATION ]]; then
+    echo "No organization specified" >&2
     exit 1
 fi
 

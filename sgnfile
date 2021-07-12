@@ -84,7 +84,7 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
     header_signature_length = 0
 
     while tlv_index < header_length:
-        (tlv_tag,) = struct.unpack_from('B', tlv_data, tlv_index)
+        tlv_tag = tlv_data[tlv_index]
         tlv_index += 1
 
         if tlv_tag == HEADER_PADDING:
@@ -115,7 +115,7 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
             print(f'Issuer Name:      {issuer_name}')
 
         elif tlv_tag == HEADER_DIGEST_ALGORITHM:
-            (digest_algorithm,) = struct.unpack_from('B', tlv_data, tlv_index)
+            digest_algorithm = tlv_data[tlv_index]
 
             print(f'Digest Algorithm: ', end = '')
 
@@ -307,9 +307,9 @@ def build_sgn_file(input_file, tftp_certificate_file, digest_algorithm, filename
     tlv_data += struct.pack('> B H', HEADER_DIGEST_ALGORITHM, 1)
 
     if digest_algorithm == 'sha1':
-        tlv_data += struct.pack('B', DIGEST_SHA1)
+        tlv_data.append(DIGEST_SHA1)
     elif digest_algorithm == 'sha512':
-        tlv_data += struct.pack('B', DIGEST_SHA512)
+        tlv_data.append(DIGEST_SHA512)
     else:
         raise ProgramError(f'Unsupported HEADER_DIGEST_ALGORITHM: {digest_algorithm}')
 
@@ -318,13 +318,13 @@ def build_sgn_file(input_file, tftp_certificate_file, digest_algorithm, filename
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_MODULUS, 1)
 
     if header_signature_length == 64:
-        tlv_data += struct.pack('B', 0)
+        tlv_data.append(0)
     elif header_signature_length == 128:
-        tlv_data += struct.pack('B', 1)
+        tlv_data.append(1)
     elif header_signature_length == 256:
-        tlv_data += struct.pack('B', 2)
+        tlv_data.append(2)
     elif header_signature_length == 512:
-        tlv_data += struct.pack('B', 3)
+        tlv_data.append(3)
     else:
         raise ProgramError(f'Unsupported HEADER_SIGNATURE_MODULUS: {header_signature_length}')
 
@@ -339,7 +339,7 @@ def build_sgn_file(input_file, tftp_certificate_file, digest_algorithm, filename
 
     # Pad to 4 byte boundary
     while (len(tlv_data) + 3 + header_signature_length) % 4:
-        tlv_data += struct.pack('B', HEADER_PADDING)
+        tlv_data.append(HEADER_PADDING)
 
     header_length = len(tlv_data) + 3 + header_signature_length
     struct.pack_into('> H', tlv_data, header_length_index + 3, header_length)
