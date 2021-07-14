@@ -636,19 +636,19 @@ def main():
             print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] TLV-FILE\n'
                   'Parse or build .tlv files.\n'
                   '\n'
-                  '  -p, --parse                    parse the specified .tlv file\n'
-                  '  -b, --build                    build new .tlv file using options below\n'
-                  '  -v, --version VERSION          signer version: 1.0 or 1.1 (default 1.0)\n'
-                  '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
-                  '  -F, --filename NAME            file name to store in .tlv header\n'
-                  '  -s, --sast CERT-FILE           add certificate with SAST role\n'
-                  '  -c, --ccm CERT-FILE            add certificate with CCM role\n'
-                  '  -t, --tftp CERT-FILE           add certificate with TFTP role\n'
-                  '  -C, --ccm-tftp CERT-FILE       add certificate with CCM+TFTP role\n'
-                  '  -A, --capf CERT-FILE           add certificate with CAPF role\n'
-                  '  -a, --app-server CERT-FILE     add certificate with APP-SERVER role\n'
-                  '  -T, --tvs CERT-FILE            add certificate with TVS role\n'
-                  '  -H, --help                     print this help and exit\n')
+                  '  -p, --parse                       parse the specified .tlv file\n'
+                  '  -b, --build                       build new .tlv file using options below\n'
+                  '  -v, --version VERSION             signer version: 1.0 or 1.1 (default 1.0)\n'
+                  '  -d, --digest ALGORITHM            digest algorithm for signature: sha1 or sha512 (default sha1)\n'
+                  '  -F, --filename NAME               file name to store in .tlv header\n'
+                  '  -s, --sast SAST-CERT-FILE         add certificate with SAST role\n'
+                  '  -c, --ccm CCM-CERT-FILE           add certificate with CCM role\n'
+                  '  -t, --tftp TFTP-CERT-FILE         add certificate with TFTP role\n'
+                  '  -C, --ccm-tftp CCM-CERT-FILE      add certificate with CCM+TFTP role\n'
+                  '  -A, --capf CAPF-CERT-FILE         add certificate with CAPF role\n'
+                  '  -a, --app-server APP-CERT-FILE    add certificate with APP-SERVER role\n'
+                  '  -T, --tvs TVS-CERT-FILE           add certificate with TVS role\n'
+                  '  -H, --help                        print this help and exit\n')
 
             return
 

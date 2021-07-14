@@ -141,8 +141,6 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
 
         elif tlv_tag == HEADER_FILENAME:
             filename = tlv_data[tlv_index:tlv_index + tlv_length]
-            tlv_index += tlv_length
-
             filename = filename[:-1].decode('utf-8')
 
             print(f'Filename:         {filename}')
@@ -427,7 +425,7 @@ def main():
                   '  -r, --remove                   remove (unsign) a .sgn file\n'
                   '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
                   '  -F, --filename NAME            file name to store in .sgn header\n'
-                  '  -t, --tftp CERT-FILE           signing/verifying certificate with tftp role\n'
+                  '  -t, --tftp TFTP-CERT-FILE      signing/verifying certificate with TFTP role\n'
                   '  -H, --help                     print this help and exit\n')
 
             return

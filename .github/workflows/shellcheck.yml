@@ -5,13 +5,15 @@ on:
     branches:
       - master
     paths:
-      - mkcert
+      - 'mkcert'
+      - '.github/workflows/shellcheck.yml'
 
   pull_request:
     branches:
       - master
     paths:
-      - mkcert
+      - 'mkcert'
+      - '.github/workflows/shellcheck.yml'
 
 jobs:
   lint:
