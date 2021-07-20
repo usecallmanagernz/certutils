@@ -111,7 +111,7 @@ while true; do
         echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
         echo "  -E, --curve CURVE                  generate an EC key using curve instead of an RSA key"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
-        echo "  -f, --file PEM-FILE                output .pem file (default COMMON-NAME.pem)"
+        echo "  -f, --file PEM-FILE                output file (default COMMON-NAME.pem)"
         echo "  -h, --help                         print this help and exit"
         echo ""
 

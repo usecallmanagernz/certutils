@@ -9,6 +9,7 @@ on:
       - 'sgnfile'
       - 'stripsgn'
       - 'tlvfile'
+      - 'enccnf'
       - '.github/workflows/pylint.yml'
 
   pull_request:
@@ -19,6 +20,7 @@ on:
       - 'sgnfile'
       - 'stripsgn'
       - 'tlvfile'
+      - 'enccnf'
       - '.github/workflows/pylint.yml'
 
 jobs:
@@ -36,4 +38,4 @@ jobs:
 
       - name: Run pylint 
         run: |
-          pylint certhash sgnfile stripsgn tlvfile 
+          pylint certhash sgnfile stripsgn tlvfile enccnf

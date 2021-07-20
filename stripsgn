@@ -53,8 +53,6 @@ def strip_sgn_file(sgn_file):
         output_file = sgn_file[:-4]
     elif sgn_file.endswith('.sha512'):
         output_file = sgn_file[:-7]
-    else:
-        raise ProgramError(f'File name must end in .sgn or .sha512: {sgn_file}')
 
     try:
         with open(output_file, 'wb') as file:
@@ -99,7 +97,7 @@ def main():
             raise ProgramError('No .sgn file specified')
 
         if not sgn_file.endswith(('.sgn', '.sha512')):
-            raise ProgramError(f'File {sgn_file} does not end with .sgn or .sha512')
+            raise ProgramError(f'File {sgn_file} does not end with .sgn or .sha512: {sgn_file}')
 
         strip_sgn_file(sgn_file)
 

@@ -1,0 +1,827 @@
+#!/usr/bin/python3
+#
+# Copyright (c) 2021 Gareth Palmer <gareth.palmer3@gmail.com>
+# This program is free software, distributed under the terms of
+# the GNU General Public License Version 2.
+
+import sys
+import os
+import os.path
+import struct
+import binascii
+from datetime import datetime
+import time
+import getopt
+import traceback
+
+from lxml import etree
+from cryptography import x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat import backends
+from cryptography.hazmat.primitives import ciphers, hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers import algorithms, modes
+
+
+HEADER_VERSION = 1
+HEADER_LENGTH = 2
+HEADER_SIGNER_INFO = 3
+HEADER_SIGNER_NAME = 4
+HEADER_SERIAL_NUMBER = 5
+HEADER_ISSUER_NAME = 6
+HEADER_SIGNATURE_INFO = 7
+HEADER_HASH_ALGORITHM = 8
+HEADER_SIGNATURE_ALGORITHM_INFO = 9
+HEADER_SIGNATURE_ALGORITHM = 10
+HEADER_SIGNATURE_MODULUS = 11
+HEADER_SIGNATURE = 12
+HEADER_PADDING = 13
+HEADER_FILENAME = 14
+HEADER_TIMESTAMP = 15
+HEADER_ENCRYPTION_INFO = 16
+HEADER_ENCRYPTION_IV_INFO = 17
+HEADER_ENCRYPTION_UNKNOWN1 = 18
+HEADER_ENCRYPTION_IV = 19
+HEADER_ENCRYPTION_PADDING = 20
+HEADER_ENCRYPTION_KEY_INFO = 21
+HEADER_ENCRYPTION_UNKNOWN2 = 22
+HEADER_ENCRYPTION_KEY_SIZE = 23
+HEADER_ENCRYPTION_KEY_ALGORITHM = 24
+HEADER_ENCRYPTION_KEY = 25
+HEADER_ENCRYPTION_HASH_ALGORITHM = 26
+HEADER_ENCRYPTION_HASH = 27
+
+HASH_SHA1 = 1
+HASH_SHA256 = 2
+HASH_SHA512 = 3
+
+
+class ProgramError(Exception):
+    pass
+
+
+def parse_enc_file(enc_file, tftp_certificate_file):
+    try:
+        with open(enc_file, 'rb') as file:
+            tlv_data = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    tlv_index = 0
+
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
+
+    if tlv_tag != HEADER_VERSION:
+        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
+
+    (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
+    tlv_index += tlv_length
+
+    version = f'{major}.{minor}'
+    print(f'Version:                     {version}')
+
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
+
+    if tlv_tag != HEADER_LENGTH:
+        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
+
+    (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+    tlv_index += tlv_length
+
+    print(f'Header Length:               {header_length} bytes')
+
+    hash_algorithm = None
+    signature_index = 0
+    signature_length = 0
+
+    while tlv_index < header_length:
+        tlv_tag = tlv_data[tlv_index]
+        tlv_index += 1
+
+        if tlv_tag == HEADER_PADDING:
+            continue
+
+        (tlv_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+        tlv_index += 2
+
+        if tlv_tag in (HEADER_SIGNER_INFO, HEADER_SIGNATURE_INFO, HEADER_SIGNATURE_ALGORITHM_INFO,
+                       HEADER_ENCRYPTION_INFO, HEADER_ENCRYPTION_IV_INFO, HEADER_ENCRYPTION_KEY_INFO):
+            continue
+
+        if tlv_tag == HEADER_SIGNER_NAME:
+            signer_name = tlv_data[tlv_index:tlv_index + tlv_length]
+            signer_name = signer_name[:-1].decode('utf-8')
+
+            print(f'Signer Name:                 {signer_name}')
+
+        elif tlv_tag == HEADER_SERIAL_NUMBER:
+            serial_number = binascii.hexlify(tlv_data[tlv_index:tlv_index + tlv_length])
+            serial_number = serial_number.decode('utf-8')
+
+            print(f'Serial Number:               {serial_number}')
+
+        elif tlv_tag == HEADER_ISSUER_NAME:
+            issuer_name = tlv_data[tlv_index:tlv_index + tlv_length]
+            issuer_name = issuer_name[:-1].decode('utf-8')
+
+            print(f'Issuer Name:                 {issuer_name}')
+
+        elif tlv_tag == HEADER_HASH_ALGORITHM:
+            hash_algorithm = tlv_data[tlv_index]
+
+            print(f'Digest Algorithm:            ', end = '')
+
+            if hash_algorithm == HASH_SHA1:
+                print('SHA1')
+            elif hash_algorithm == HASH_SHA512:
+                print('SHA512')
+            else:
+                print(f'{hash_algorithm}')
+
+        elif tlv_tag in (HEADER_SIGNATURE_ALGORITHM, HEADER_SIGNATURE_MODULUS):
+            pass
+
+        elif tlv_tag == HEADER_SIGNATURE:
+            signature = tlv_data[tlv_index:tlv_index + tlv_length]
+
+            print(f'Signature:                   {tlv_length} bytes')
+
+            signature_index = tlv_index - 3
+            signature_length = tlv_length
+
+        elif tlv_tag == HEADER_FILENAME:
+            filename = tlv_data[tlv_index:tlv_index + tlv_length]
+            filename = filename[:-1].decode('utf-8')
+
+            print(f'Filename:                    {filename}')
+
+        elif tlv_tag == HEADER_TIMESTAMP:
+            (timestamp,) = struct.unpack_from('> I', tlv_data, tlv_index)
+            timestamp = datetime.fromtimestamp(timestamp)
+
+            print(timestamp.strftime('Timestamp:                   %Y-%m-%d %H:%M:%S'))
+
+        elif tlv_tag in (HEADER_ENCRYPTION_UNKNOWN1, HEADER_ENCRYPTION_PADDING,
+                         HEADER_ENCRYPTION_KEY_SIZE, HEADER_ENCRYPTION_UNKNOWN2,
+                         HEADER_ENCRYPTION_KEY_ALGORITHM):
+            pass
+
+        elif tlv_tag == HEADER_ENCRYPTION_IV:
+            print(f'Encryption IV:               {tlv_length} bytes')
+
+        elif tlv_tag == HEADER_ENCRYPTION_KEY:
+            print(f'Encryption Key:              {tlv_length} bytes')
+
+        elif tlv_tag == HEADER_ENCRYPTION_HASH_ALGORITHM:
+            encryption_hash_algorithm = tlv_data[tlv_index]
+
+            print(f'Encryption Digest Algorithm: ', end = '')
+
+            if encryption_hash_algorithm == HASH_SHA1:
+                print('SHA1')
+            elif encryption_hash_algorithm == HASH_SHA512:
+                print('SHA512')
+            else:
+                print(f'{encryption_hash_algorithm}')
+
+        elif tlv_tag == HEADER_ENCRYPTION_HASH:
+            encryption_hash = tlv_data[tlv_index:tlv_index + tlv_length]
+            encryption_hash = binascii.hexlify(encryption_hash).decode('utf-8')
+
+            print(f'Encryption Digest:           {encryption_hash}')
+
+        else:
+            raise ProgramError(f'Unknown HEADER tag: {tlv_tag}')
+
+        tlv_index += tlv_length
+
+    print('')
+
+    if hash_algorithm is None:
+        raise ProgramError(f'Missing HEADER_HASH_ALGORITHM')
+
+    if hash_algorithm not in (HASH_SHA1, HASH_SHA512):
+        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
+
+    if signature_index is None:
+        raise ProgramError('Missing HEADER_SIGNATURE')
+
+    if tftp_certificate_file is None:
+        print('No certificate specified, unable to check signature')
+        return
+
+    try:
+        with open(tftp_certificate_file, 'rb') as file:
+            certificate = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    try:
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
+
+    public_key = certificate.public_key()
+
+    if hash_algorithm == HASH_SHA1:
+        hash = hashes.SHA1()
+    elif hash_algorithm == HASH_SHA512:
+        hash = hashes.SHA512()
+
+    signature = tlv_data[signature_index + 3:signature_index + 3 + signature_length]
+    tlv_data = tlv_data[:signature_index] + tlv_data[signature_index + 3 + signature_length:]
+
+    try:
+        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hash)
+    except InvalidSignature:
+        print('Invalid signature')
+    else:
+        print('Valid signature')
+
+
+def remove_enc_file(enc_file, private_key_file):
+    try:
+        with open(private_key_file, 'rb') as file:
+            private_key = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    try:
+        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No private key in file: {private_key_file}')
+
+    try:
+        with open(enc_file, 'rb') as file:
+            tlv_data = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    tlv_index = 0
+
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
+
+    if tlv_tag != HEADER_VERSION:
+        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
+
+    (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
+    tlv_index += tlv_length
+
+    (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
+    tlv_index += 3
+
+    if tlv_tag != HEADER_LENGTH:
+        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
+
+    (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+    tlv_index += tlv_length
+
+    encryption_iv = None
+    encryption_padding = 0
+    encryption_key = None
+    encryption_hash_algorithm = None
+    encryption_hash = None
+
+    while tlv_index < header_length:
+        tlv_tag = tlv_data[tlv_index]
+        tlv_index += 1
+
+        if tlv_tag == HEADER_PADDING:
+            continue
+
+        (tlv_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
+        tlv_index += 2
+
+        if tlv_tag in (HEADER_SIGNER_INFO, HEADER_SIGNATURE_INFO, HEADER_SIGNATURE_ALGORITHM_INFO,
+                       HEADER_ENCRYPTION_INFO, HEADER_ENCRYPTION_IV_INFO, HEADER_ENCRYPTION_KEY_INFO):
+            continue
+
+        if tlv_tag in (HEADER_SIGNER_NAME, HEADER_SERIAL_NUMBER, HEADER_ISSUER_NAME, HEADER_HASH_ALGORITHM,
+                       HEADER_SIGNATURE_ALGORITHM, HEADER_SIGNATURE_MODULUS, HEADER_SIGNATURE, HEADER_FILENAME,
+                       HEADER_TIMESTAMP, HEADER_ENCRYPTION_UNKNOWN1, HEADER_ENCRYPTION_KEY_SIZE,
+                       HEADER_ENCRYPTION_UNKNOWN2, HEADER_ENCRYPTION_KEY_ALGORITHM):
+            pass
+
+        elif tlv_tag == HEADER_ENCRYPTION_IV:
+            encryption_iv = tlv_data[tlv_index:tlv_index + tlv_length]
+
+        elif tlv_tag == HEADER_ENCRYPTION_PADDING:
+            (encryption_padding,) = struct.unpack_from('> H ', tlv_data, tlv_index)
+
+        elif tlv_tag == HEADER_ENCRYPTION_KEY:
+            encryption_key = tlv_data[tlv_index:tlv_index + tlv_length]
+
+        elif tlv_tag == HEADER_ENCRYPTION_HASH_ALGORITHM:
+            encryption_hash_algorithm = tlv_data[tlv_index]
+
+        elif tlv_tag == HEADER_ENCRYPTION_HASH:
+            encryption_hash = tlv_data[tlv_index:tlv_index + tlv_length]
+            encryption_hash = binascii.hexlify(encryption_hash).decode('utf-8')
+
+        else:
+            raise ProgramError(f'Unknown HEADER tag: {tlv_tag}')
+
+        tlv_index += tlv_length
+
+    if encryption_iv is None:
+        raise ProgramError('Missing HEADER_ENCRYPTION_IV')
+
+    if encryption_key is None:
+        raise ProgramError('Missing HEADER_ENCRYPTION_KEY')
+
+    if encryption_hash_algorithm is None:
+        raise ProgramError(f'Missing HEADER_ENCRYPTION_HASH_ALGORITHM: {encryption_hash_algorithm}')
+
+    if encryption_hash is None:
+        raise ProgramError('Missing HEADER_ENCRYPTION_HASH')
+
+    xml = tlv_data[header_length:]
+
+    try:
+        encryption_key = private_key.decrypt(encryption_key, padding.PKCS1v15())
+    except ValueError:
+        raise ProgramError('Unable to decrypt encryption key')
+
+    cipher = ciphers.Cipher(algorithms.AES(encryption_key), modes.CBC(encryption_iv), backends.default_backend())
+    decryptor = cipher.decryptor()
+
+    xml = decryptor.update(xml) + decryptor.finalize()
+    xml = xml[:-encryption_padding]
+
+    if encryption_hash_algorithm == HASH_SHA1:
+        hash = hashes.SHA1()
+    elif encryption_hash_algorithm == HASH_SHA512:
+        hash = hashes.SHA512()
+
+    digest = hashes.Hash(hash, backends.default_backend())
+    digest.update(xml)
+
+    xml_hash = digest.finalize()
+    xml_hash = binascii.hexlify(xml_hash).decode('utf-8')
+
+    if xml_hash != encryption_hash:
+        raise ProgramError(f'Mismatched encryption digest: {xml_hash}')
+
+    sgn_file = enc_file[:-8] + '.sgn'
+    cnf_file = enc_file[:-8]
+
+    try:
+        with open(cnf_file, 'wb') as file:
+            file.write(xml)
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    if os.path.exists(sgn_file):
+        os.unlink(sgn_file)
+
+    os.unlink(enc_file)
+
+    print(f'Wrote {cnf_file}, deleted {sgn_file} and {enc_file}')
+
+
+def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algorithm):
+    try:
+        with open(certificate_file, 'rb') as file:
+            certificate = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    try:
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
+
+    public_key = certificate.public_key()
+
+    certificate_hash = certificate.fingerprint(hashes.MD5())
+    certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
+
+    try:
+        with open(tftp_certificate_file, 'rb') as file:
+            certificate = private_key = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    try:
+        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
+
+    try:
+        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No private key in file: {tftp_certificate_file}')
+
+    signature_length = private_key.key_size // 8
+
+    sgn_file = cnf_file + '.sgn'
+    enc_file = cnf_file + '.enc.sgn'
+
+    try:
+        with open(cnf_file, 'rb') as file:
+            xml = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    try:
+        document = etree.fromstring(xml, etree.XMLParser(remove_blank_text = True))
+    except etree.XMLSyntaxError as error:
+        raise ProgramError(error)
+
+    tlv_data = bytearray()
+    tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 2, 0)
+
+    header_length_index = len(tlv_data)
+    tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
+
+    signer_name = ''
+
+    for attribute in certificate.subject:
+        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
+
+    signer_name = signer_name.encode('utf-8') + b'\x00'
+    issuer_name = ''
+
+    for attribute in certificate.issuer:
+        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
+
+    issuer_name = issuer_name.encode('utf-8') + b'\x00'
+
+    serial_number = certificate.serial_number
+    serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
+
+    signer_info = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(issuer_name)
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, signer_info)
+
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
+    tlv_data += signer_name
+
+    tlv_data += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
+    tlv_data += serial_number
+
+    tlv_data += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
+    tlv_data += issuer_name
+
+    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
+    tlv_data += struct.pack('> B H', HEADER_HASH_ALGORITHM, 1)
+
+    if hash_algorithm == 'sha1':
+        tlv_data.append(HASH_SHA1)
+    elif hash_algorithm == 'sha512':
+        tlv_data.append(HASH_SHA512)
+    else:
+        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
+
+    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_ALGORITHM_INFO, 8)
+    tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_ALGORITHM, 1, 0)
+    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_MODULUS, 1)
+
+    if signature_length == 64:
+        tlv_data.append(0)
+    elif signature_length == 128:
+        tlv_data.append(1)
+    elif signature_length == 256:
+        tlv_data.append(2)
+    elif signature_length == 512:
+        tlv_data.append(3)
+    else:
+        raise ProgramError(f'Unsupported HEADER_SIGNATURE_MODULUS')
+
+    signature_index = len(tlv_data)
+    filename = os.path.basename(enc_file).encode('utf-8') + b'\x00'
+
+    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename))
+    tlv_data += filename
+
+    tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
+
+    if hash_algorithm == 'sha1':
+        hash = hashes.SHA1()
+    elif hash_algorithm == 'sha512':
+        hash = hashes.SHA512()
+
+    digest = hashes.Hash(hash, backends.default_backend())
+    digest.update(xml)
+
+    encryption_hash = digest.finalize()
+
+    encryption_iv = os.urandom(16)
+    encryption_key = os.urandom(16)
+
+    # Pad to encryption key length
+    encryption_padding = len(encryption_key) - (len(xml) % len(encryption_key))
+    xml += encryption_padding * b'\r'
+
+    cipher = ciphers.Cipher(algorithms.AES(encryption_key), modes.CBC(encryption_iv), backends.default_backend())
+    encryptor = cipher.encryptor()
+
+    xml = encryptor.update(xml) + encryptor.finalize()
+    encryption_key = public_key.encrypt(encryption_key, padding.PKCS1v15())
+
+    encryption_info_index = len(tlv_data)
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_INFO, 0)
+
+    encryption_iv_info = 3 + 1 + 3 + len(encryption_iv) + 3 + 2
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_IV_INFO, encryption_iv_info)
+
+    tlv_data += struct.pack('> B H B', HEADER_ENCRYPTION_UNKNOWN1, 1, 0)
+
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_IV, len(encryption_iv))
+    tlv_data += encryption_iv
+
+    tlv_data += struct.pack('> B H H', HEADER_ENCRYPTION_PADDING, 2, encryption_padding)
+
+    encryption_key_info = 3 + 1 + 3 + 2 + 3 + 1 + 3 + len(encryption_key)
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_KEY_INFO, encryption_key_info)
+
+    tlv_data += struct.pack('> B H B', HEADER_ENCRYPTION_UNKNOWN2, 1, 0)
+    tlv_data += struct.pack('> B H H', HEADER_ENCRYPTION_KEY_SIZE, 2, 16 * 8)
+    tlv_data += struct.pack('> B H B', HEADER_ENCRYPTION_KEY_ALGORITHM, 1, 1)
+
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_KEY, len(encryption_key))
+    tlv_data += encryption_key
+
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_HASH_ALGORITHM, 1)
+
+    if hash_algorithm == 'sha1':
+        tlv_data.append(HASH_SHA1)
+    elif hash_algorithm == 'sha512':
+        tlv_data.append(HASH_SHA512)
+    else:
+        raise ProgramError(f'Unsupported HEADER_ENCRYPTION_HASH_ALGORITHM: {hash_algorithm}')
+
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_HASH, len(encryption_hash))
+    tlv_data += encryption_hash
+
+    struct.pack_into('> H', tlv_data, encryption_info_index + 1, len(tlv_data) - (encryption_info_index + 3))
+
+    # Pad to 4 byte boundary
+    while (len(tlv_data) + 3 + signature_length) % 4:
+        tlv_data.append(HEADER_PADDING)
+
+    header_length = len(tlv_data) + 3 + signature_length
+    struct.pack_into('> H', tlv_data, header_length_index + 3, header_length)
+
+    tlv_data += xml
+
+    if hash_algorithm == 'sha1':
+        hash = hashes.SHA1()
+    elif hash_algorithm == 'sha512':
+        hash = hashes.SHA512()
+
+    tlv_data = bytes(tlv_data)
+    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
+
+    try:
+        with open(enc_file, 'wb') as file:
+            file.write(tlv_data[:signature_index])
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
+            file.write(tlv_data[signature_index:])
+
+    except (PermissionError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    elements = []
+
+    element = etree.Element('fullConfig')
+    element.text = 'true'
+    elements.append(element)
+
+    for element in document:
+        if element.tag in ('ipAddressMode', 'loadInformation', 'capfAuthMode', 'capfList'):
+            elements.append(element)
+
+    element = etree.Element('certHash')
+    element.text = certificate_hash
+    elements.append(element)
+
+    element = etree.Element('encrConfig')
+    element.text = 'true'
+    elements.append(element)
+
+    document.clear()
+    document.extend(elements)
+
+    xml = b'<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(document, pretty_print = True)
+
+    tlv_data = bytearray()
+    tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 1, 0)
+
+    header_length_index = len(tlv_data)
+    tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
+
+    signer_name = ''
+
+    for attribute in certificate.subject:
+        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
+
+    signer_name = signer_name.encode('utf-8') + b'\x00'
+    issuer_name = ''
+
+    for attribute in certificate.issuer:
+        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
+
+    issuer_name = issuer_name.encode('utf-8') + b'\x00'
+
+    serial_number = certificate.serial_number
+    serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
+
+    signer_info = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(issuer_name)
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, signer_info)
+
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
+    tlv_data += signer_name
+
+    tlv_data += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
+    tlv_data += serial_number
+
+    tlv_data += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
+    tlv_data += issuer_name
+
+    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
+    tlv_data += struct.pack('> B H', HEADER_HASH_ALGORITHM, 1)
+
+    if hash_algorithm == 'sha1':
+        tlv_data.append(HASH_SHA1)
+    elif hash_algorithm == 'sha512':
+        tlv_data.append(HASH_SHA512)
+    else:
+        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
+
+    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_ALGORITHM_INFO, 8)
+    tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_ALGORITHM, 1, 0)
+    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_MODULUS, 1)
+
+    if signature_length == 64:
+        tlv_data.append(0)
+    elif signature_length == 128:
+        tlv_data.append(1)
+    elif signature_length == 256:
+        tlv_data.append(2)
+    elif signature_length == 512:
+        tlv_data.append(3)
+    else:
+        raise ProgramError(f'Unsupported HEADER_SIGNATURE_MODULUS')
+
+    signature_index = len(tlv_data)
+    filename = os.path.basename(sgn_file).encode('utf-8') + b'\x00'
+
+    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename))
+    tlv_data += filename
+
+    tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
+
+    # Pad to 4 byte boundary
+    while (len(tlv_data) + 3 + signature_length) % 4:
+        tlv_data.append(HEADER_PADDING)
+
+    header_length = len(tlv_data) + 3 + signature_length
+    struct.pack_into('> H', tlv_data, header_length_index + 3, header_length)
+
+    tlv_data += xml
+
+    if hash_algorithm == 'sha1':
+        hash = hashes.SHA1()
+    elif hash_algorithm == 'sha512':
+        hash = hashes.SHA512()
+
+    tlv_data = bytes(tlv_data)
+    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
+
+    try:
+        with open(sgn_file, 'wb') as file:
+            file.write(tlv_data[:signature_index])
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
+            file.write(tlv_data[signature_index:])
+
+    except (PermissionError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    os.unlink(cnf_file)
+
+    print(f'Built {enc_file} and {sgn_file}, deleted {cnf_file}')
+
+
+def main():
+    try:
+        short_options = 'pbrd:t:c:k:H'
+        long_options = ['parse', 'build', 'remove', 'digest=', 'tftp=', 'certificate=', 'key=', 'help']
+
+        mode = None
+        enc_file = cnf_file = None
+        tftp_certificate_file = None
+        certificate_file = None
+        private_key_file = None
+        hash_algorithm = 'sha1'
+        help = False
+
+        try:
+            options, arguments = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
+        except getopt.GetoptError as error:
+            raise ProgramError(error.msg[0].upper() + error.msg[1:] +
+                               '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
+
+        for option, argument in options:
+            if option in ('-p', '--parse'):
+                mode = 'parse'
+
+            elif option in ('-b', '--build'):
+                mode = 'build'
+
+            elif option in ('-r', '--remove'):
+                mode = 'remove'
+
+            elif option in ('-d', '--digest'):
+                hash_algorithm = argument
+
+                if hash_algorithm not in ('sha1', 'sha512'):
+                    raise ProgramError(f'Invalid digest: {hash_algorithm}')
+
+            elif option in ('-t', '--tftp'):
+                tftp_certificate_file = argument
+
+            elif option in ('-c', '--certificate'):
+                certificate_file = argument
+
+            elif option in ('-k', '--key'):
+                private_key_file = argument
+
+            elif option in ('-H', '--help'):
+                help = True
+
+        if help:
+            print('Usage: ' + os.path.basename(sys.argv[0]) + ' [OPTIONS] {ENC-SGN-FILE | CNF-XML-FILE}\n'
+                  'Parse, build (encrypt) or remove (decrypt) .cnf.xml or .enc.sgn files.\n'
+                  '\n'
+                  '  -p, --parse                    parse the specified .enc.sgn file\n'
+                  '  -b, --build                    build new .enc.sgn file using options below\n'
+                  '  -r, --remove                   remove (unsign) a .enc.sgn file\n'
+                  '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
+                  '  -t, --tftp TFTP-CERT-FILE      signing/verifying certificate with tftp role\n'
+                  '  -c, --certificate CERT-FILE    certificate to encrypt file\n'
+                  '  -k, --key KEY-FILE             private key to decrypt file\n'
+                  '  -H, --help                     print this help and exit\n')
+
+            return
+
+        if mode is None:
+            raise ProgramError('No mode specified (either parse, build or remove). Try --help')
+
+        if len(arguments):
+            enc_file = cnf_file = arguments[0]
+
+        if mode in ('parse', 'remove'):
+            if enc_file is None:
+                raise ProgramError('No .enc.sgn file specified')
+
+            if not enc_file.endswith('.enc.sgn'):
+                raise ProgramError(f'File name does not end with .enc.sgn: {enc_file}')
+
+            if mode == 'parse':
+                parse_enc_file(enc_file, tftp_certificate_file)
+
+            elif mode == 'remove':
+                if private_key_file is None:
+                    raise ProgramError(f'No private-key file specified')
+
+                remove_enc_file(enc_file, private_key_file)
+
+        elif mode == 'build':
+            if cnf_file is None:
+                raise ProgramError('No file specified')
+
+            if not cnf_file.endswith('.cnf.xml'):
+                raise ProgramError(f'File name does not end with .cnf.xml: {cnf_file}')
+
+            if tftp_certificate_file is None:
+                raise ProgramError('No TFTP certificate file specified')
+
+            if certificate_file is None:
+                raise ProgramError('No certificate file specified')
+
+            build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algorithm)
+
+    except ProgramError as error:
+        print(str(error), file = sys.stderr)
+        exit(1)
+
+    except Exception:
+        traceback.print_exc(file = sys.stderr)
+        exit(1)
+
+    exit(0)
+
+
+if __name__ == '__main__':
+    main()
