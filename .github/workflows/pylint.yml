@@ -34,7 +34,7 @@ jobs:
 
       - name: Install packages
         run: |
-          sudo apt install pylint python3-cryptography
+          sudo apt install pylint python3-cryptography python3-lxml
 
       - name: Run pylint 
         run: |
