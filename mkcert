@@ -196,7 +196,7 @@ ${COUNTRY:+countryName = $COUNTRY}
 
 [x509_extensions]
 basicConstraints = critical, CA:true, pathlen:0
-keyUsage = Certificate Sign, Digital Signature, Key Encipherment, Data Encipherment
+keyUsage = Certificate Sign, CRL Sign, Digital Signature, Key Encipherment, Data Encipherment
 extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication
 subjectKeyIdentifier = hash
 subjectAltName = DNS:$COMMON_NAME
