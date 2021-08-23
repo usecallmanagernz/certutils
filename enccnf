@@ -339,6 +339,9 @@ def remove_enc_file(enc_file, private_key_file):
     if encryption_hash_algorithm is None:
         raise ProgramError(f'Missing HEADER_ENCRYPTION_HASH_ALGORITHM: {encryption_hash_algorithm}')
 
+    if encryption_hash_algorithm not in (HASH_SHA1, HASH_SHA512):
+        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {encryption_hash_algorithm}')
+
     if encryption_hash is None:
         raise ProgramError('Missing HEADER_ENCRYPTION_HASH')
 
@@ -598,7 +601,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     elements = []
 
     element = etree.Element('fullConfig')
-    element.text = 'true'
+    element.text = 'false'
     elements.append(element)
 
     for element in document:

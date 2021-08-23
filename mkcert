@@ -172,7 +172,7 @@ certificate = $TEMP_DIR/crt.pem
 private_key = $TEMP_DIR/key.pem
 x509_extensions = x509_extensions
 policy = policy_default
-copy_extensons = none
+copy_extensions = none
 email_in_dn = yes
 preserve = no
 unique_subject = no
@@ -202,7 +202,7 @@ ${COUNTRY:+countryName = $COUNTRY}
 [x509_extensions]
 basicConstraints = critical, CA:true, pathlen:0
 keyUsage = Certificate Sign, CRL Sign, Digital Signature, Key Encipherment, Data Encipherment
-extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication
+extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication, IPSec End System
 subjectKeyIdentifier = hash
 subjectAltName = DNS:$COMMON_NAME
 EOF
