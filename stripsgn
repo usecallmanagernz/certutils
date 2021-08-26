@@ -49,10 +49,7 @@ def strip_sgn_file(sgn_file):
     tlv_index += tlv_length
 
     # Remove .sgn or .sha512
-    if sgn_file.endswith('.sgn'):
-        output_file = sgn_file[:-4]
-    elif sgn_file.endswith('.sha512'):
-        output_file = sgn_file[:-7]
+    output_file = sgn_file[:sgn_file.rindex('.')]
 
     try:
         with open(output_file, 'wb') as file:

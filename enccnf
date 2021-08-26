@@ -372,6 +372,7 @@ def remove_enc_file(enc_file, private_key_file):
     if xml_hash != encryption_hash:
         raise ProgramError(f'Mismatched encryption digest: {xml_hash}')
 
+    # Remove .enc.sgn
     sgn_file = enc_file[:-8] + '.sgn'
     cnf_file = enc_file[:-8]
 
@@ -491,18 +492,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_ALGORITHM_INFO, 8)
     tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_ALGORITHM, 1, 0)
-    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_MODULUS, 1)
-
-    if signature_length == 64:
-        tlv_data.append(0)
-    elif signature_length == 128:
-        tlv_data.append(1)
-    elif signature_length == 256:
-        tlv_data.append(2)
-    elif signature_length == 512:
-        tlv_data.append(3)
-    else:
-        raise ProgramError(f'Unsupported HEADER_SIGNATURE_MODULUS')
+    tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_MODULUS, 1, [64, 128, 256, 512].index(signature_length))
 
     signature_index = len(tlv_data)
     filename = os.path.basename(enc_file).encode('utf-8') + b'\x00'
@@ -667,18 +657,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_ALGORITHM_INFO, 8)
     tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_ALGORITHM, 1, 0)
-    tlv_data += struct.pack('> B H', HEADER_SIGNATURE_MODULUS, 1)
-
-    if signature_length == 64:
-        tlv_data.append(0)
-    elif signature_length == 128:
-        tlv_data.append(1)
-    elif signature_length == 256:
-        tlv_data.append(2)
-    elif signature_length == 512:
-        tlv_data.append(3)
-    else:
-        raise ProgramError(f'Unsupported HEADER_SIGNATURE_MODULUS')
+    tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_MODULUS, 1, [64, 128, 256, 512].index(signature_length))
 
     signature_index = len(tlv_data)
     filename = os.path.basename(sgn_file).encode('utf-8') + b'\x00'
