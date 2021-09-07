@@ -138,6 +138,11 @@ if [[ -z $ORGANIZATION ]]; then
     exit 1
 fi
 
+if [[ -z $ORGANIZATIONAL_UNIT ]]; then
+    echo "No organizational unit specified" >&2
+    exit 1
+fi
+
 if [[ -z $OUTPUT_FILE ]]; then
     OUTPUT_FILE="$1"
 

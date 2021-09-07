@@ -75,7 +75,7 @@ def main():
             raise ProgramError(error.msg[0].upper() + error.msg[1:] +
                                '. Try \'' + os.path.basename(sys.argv[0]) + ' --help\' for more information')
 
-        for option, unused in options:
+        for option, _ in options:
             if option in ('-H', '--help'):
                 help = True
 
