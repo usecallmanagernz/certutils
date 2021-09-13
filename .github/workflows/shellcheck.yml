@@ -1,11 +1,12 @@
 name: shell lint
-  
+
 on:
   push:
     branches:
       - master
     paths:
       - 'mkcert'
+      - 'bash_completion'
       - '.shellcheckrc'
       - '.github/workflows/shellcheck.yml'
 
@@ -14,6 +15,7 @@ on:
       - master
     paths:
       - 'mkcert'
+      - 'bash_completion'
       - '.shellcheckrc'
       - '.github/workflows/shellcheck.yml'
 
@@ -32,4 +34,4 @@ jobs:
 
       - name: Run shellcheck
         run: |
-          shellcheck mkcert
+          shellcheck mkcert bash_completion

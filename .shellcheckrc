@@ -1,1 +1,2 @@
-disable=SC2001,SC2064,SC2181
+shell=bash
+disable=SC2001,SC2064,SC2181,SC2207
