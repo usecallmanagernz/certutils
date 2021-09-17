@@ -2,8 +2,8 @@
 
 _certhash_completion() {
     if [[ ${2:0:1} = - ]]; then
-        COMPREPLY=($(compgen -W "-d --digest -H --help" -- "$2"))
-    elif [[ $3 == -d || $3 == --digest ]]; then
+        COMPREPLY=($(compgen -W "--digest --help" -- "$2"))
+    elif [[ $3 = --digest ]]; then
         COMPREPLY=($(compgen -W "sha1 sha512" -- "$2"))
     else
         COMPREPLY=($(compgen -f -- "$2"))
@@ -16,9 +16,9 @@ complete -F _certhash_completion certhash
 
 _enccnf_completion() {
     if [[ ${2:0:1} = - ]]; then
-        COMPREPLY=($(compgen -W "-p --parse -b --build -r --remove -d --digest \
-                                 -t --tftp -c --certificate -k --key -H --help" -- "$2"))
-    elif [[ $3 == -d || $3 == --digest ]]; then
+        COMPREPLY=($(compgen -W "--parse --build --remove --digest \
+                                 --tftp --certificate --key --help" -- "$2"))
+    elif [[ $3 = --digest ]]; then
         COMPREPLY=($(compgen -W "sha1 sha512" -- "$2"))
     else
         COMPREPLY=($(compgen -f -- "$2"))
@@ -31,9 +31,9 @@ complete -F _enccnf_completion enccnf
 
 _mkcert_completion() {
     if [[ ${2:0:1} = - ]]; then
-        COMPREPLY=($(compgen -W "-c --common -o --organization -u --unit -l --locality -s --state -C --country \
-                                 -y --years -b --bits -E --curve -d --digest -f --file -H --help" -- "$2"))
-    elif [[ $3 == -d || $3 == --digest ]]; then
+        COMPREPLY=($(compgen -W "--common --organization --unit --locality --state --country \
+                                 --years --bits --curve --digest --file --help" -- "$2"))
+    elif [[ $3 = --digest ]]; then
         COMPREPLY=($(compgen -W "sha1 sha512" -- "$2"))
     else
         COMPREPLY=($(compgen -f -- "$2"))
@@ -46,8 +46,8 @@ complete -F _mkcert_completion mkcert
 
 _sgnfile_completion() {
     if [[ ${2:0:1} = - ]]; then
-        COMPREPLY=($(compgen -W "-p --parse -b --build -r --remove -d --digest -t --tftp -H --help" -- "$2"))
-    elif [[ $3 == -d || $3 == --digest ]]; then
+        COMPREPLY=($(compgen -W "--parse --build --remove --digest --tftp --help" -- "$2"))
+    elif [[ $3 = --digest ]]; then
         COMPREPLY=($(compgen -W "sha1 sha512" -- "$2"))
     else
         COMPREPLY=($(compgen -f -- "$2"))
@@ -60,7 +60,7 @@ complete -F _sgnfile_completion sgnfile
 
 _stripsgn_completion() {
     if [[ ${2:0:1} = - ]]; then
-        COMPREPLY=($(compgen -W "-H --help" -- "$2"))
+        COMPREPLY=($(compgen -W "--help" -- "$2"))
     else
         COMPREPLY=($(compgen -f -- "$2"))
     fi
@@ -72,12 +72,11 @@ complete -F _stripsgn_completion stripsgn
 
 _tlvfile_completion() {
     if [[ ${2:0:1} = - ]]; then
-        COMPREPLY=($(compgen -W "-p --parse -b --build -r --remove -v --version -d --digest -F --filename \
-                                 -s --sast -c --ccm -t --tftp -C --ccm-tftp -A --capf -a --app-server -T --tvs \
-                                 -H --help" -- "$2"))
-    elif [[ $3 == -d || $3 == --digest ]]; then
+        COMPREPLY=($(compgen -W "--parse --build --remove --version --digest --filename \
+                                 --sast --ccm --tftp --ccm-tftp --capf --app-server --tvs --help" -- "$2"))
+    elif [[ $3 = --digest ]]; then
         COMPREPLY=($(compgen -W "sha1 sha512" -- "$2"))
-    elif [[ $3 == -v || $3 == --version ]]; then
+    elif [[ $3 = --version ]]; then
         COMPREPLY=($(compgen -W "1.0 1.1" -- "$2"))
     else
         COMPREPLY=($(compgen -f -- "$2"))
