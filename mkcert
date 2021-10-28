@@ -184,8 +184,8 @@ unique_subject = no
 
 [policy_default]
 commonName = supplied
-organizationalUnitName = optional
-organizationName = optional
+organizationName = supplied
+organizationalUnitName = supplied
 localityName = optional
 stateOrProvinceName = optional
 countryName = optional
@@ -198,8 +198,8 @@ prompt = no
 
 [distinguished_name]
 commonName = $COMMON_NAME
-${ORGANIZATION:+organizationName = $ORGANIZATION}
-${ORGANIZATIONAL_UNIT:+organizationalUnitName = $ORGANIZATIONAL_UNIT}
+organizationName = $ORGANIZATION
+organizationalUnitName = $ORGANIZATIONAL_UNIT
 ${LOCALITY:+localityName = $LOCALITY}
 ${STATE:+stateOrProvinceName = $STATE}
 ${COUNTRY:+countryName = $COUNTRY}
