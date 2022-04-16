@@ -402,7 +402,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     try:
         certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
+        raise ProgramError(f'No certificate in file: {certificate_file}')
 
     public_key = certificate.public_key()
 
@@ -528,6 +528,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     encryption_info_index = len(tlv_data)
     tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_INFO, 0)
 
+    # Combined length of the next 3 fields
     encryption_iv_info = 3 + 1 + 3 + len(encryption_iv) + 3 + 2
     tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_IV_INFO, encryption_iv_info)
 
@@ -538,6 +539,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     tlv_data += struct.pack('> B H H', HEADER_ENCRYPTION_PADDING, 2, encryption_padding)
 
+    # Combined length of the next 4 fields
     encryption_key_info = 3 + 1 + 3 + 2 + 3 + 1 + 3 + len(encryption_key)
     tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_KEY_INFO, encryption_key_info)
 
