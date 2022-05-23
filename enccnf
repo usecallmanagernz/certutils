@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #
 # Copyright (c) 2021 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
@@ -19,7 +19,7 @@ from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat import backends
 from cryptography.hazmat.primitives import ciphers, hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
 
@@ -246,15 +246,18 @@ def parse_enc_file(enc_file, tftp_certificate_file):
 def remove_enc_file(enc_file, private_key_file):
     try:
         with open(private_key_file, 'rb') as file:
-            private_key = file.read()
+            device_private_key = file.read()
 
     except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
+        device_private_key = serialization.load_pem_private_key(device_private_key, None, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No private key in file: {private_key_file}')
+        raise ProgramError(f'No private-key in file: {private_key_file}')
+
+    if not isinstance(device_private_key, (rsa.RSAPrivateKey, ec.EllipticCurvePrivateKey)):
+        raise ProgramError(f'No RSA or EC private-key in file: {private_key_file}')
 
     try:
         with open(enc_file, 'rb') as file:
@@ -348,7 +351,7 @@ def remove_enc_file(enc_file, private_key_file):
     xml = tlv_data[header_length:]
 
     try:
-        encryption_key = private_key.decrypt(encryption_key, padding.PKCS1v15())
+        encryption_key = device_private_key.decrypt(encryption_key, padding.PKCS1v15())
     except ValueError:
         raise ProgramError('Unable to decrypt encryption key')
 
@@ -393,23 +396,6 @@ def remove_enc_file(enc_file, private_key_file):
 
 def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algorithm):
     try:
-        with open(certificate_file, 'rb') as file:
-            certificate = file.read()
-
-    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
-        raise ProgramError(f'{error.strerror}: {error.filename}')
-
-    try:
-        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
-    except ValueError:
-        raise ProgramError(f'No certificate in file: {certificate_file}')
-
-    public_key = certificate.public_key()
-
-    certificate_hash = certificate.fingerprint(hashes.MD5())
-    certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
-
-    try:
         with open(tftp_certificate_file, 'rb') as file:
             certificate = private_key = file.read()
 
@@ -421,12 +407,40 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     except ValueError:
         raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
 
+    public_key = certificate.public_key()
+
+    if not isinstance(public_key, rsa.RSAPublicKey):
+        raise ProgramError(f'No RSA public-key in file: {tftp_certificate_file}')
+
     try:
         private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
     except ValueError:
-        raise ProgramError(f'No private key in file: {tftp_certificate_file}')
+        raise ProgramError(f'No private-key in file: {tftp_certificate_file}')
+
+    if not isinstance(private_key, rsa.RSAPrivateKey):
+        raise ProgramError(f'No RSA private-key in file: {tftp_certificate_file}')
 
     signature_length = private_key.key_size // 8
+
+    try:
+        with open(certificate_file, 'rb') as file:
+            device_certificate = file.read()
+
+    except (PermissionError, FileNotFoundError, IsADirectoryError) as error:
+        raise ProgramError(f'{error.strerror}: {error.filename}')
+
+    try:
+        device_certificate = x509.load_pem_x509_certificate(device_certificate, backends.default_backend())
+    except ValueError:
+        raise ProgramError(f'No certificate in file: {certificate_file}')
+
+    device_public_key = device_certificate.public_key()
+
+    if not isinstance(device_public_key, (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
+        raise ProgramError(f'No RSA or EC public-key in file: {certificate_file}')
+
+    certificate_hash = device_certificate.fingerprint(hashes.MD5())
+    certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
 
     sgn_file = cnf_file + '.sgn'
     enc_file = cnf_file + '.enc.sgn'
@@ -523,7 +537,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     encryptor = cipher.encryptor()
 
     xml = encryptor.update(xml) + encryptor.finalize()
-    encryption_key = public_key.encrypt(encryption_key, padding.PKCS1v15())
+    encryption_key = device_public_key.encrypt(encryption_key, padding.PKCS1v15())
 
     encryption_info_index = len(tlv_data)
     tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_INFO, 0)
@@ -757,7 +771,7 @@ def main():
                   '  -d, --digest ALGORITHM         digest algorithm for signature: sha1 or sha512 (default sha1)\n'
                   '  -t, --tftp TFTP-CERT-FILE      signing/verifying certificate with tftp role\n'
                   '  -c, --certificate CERT-FILE    certificate to encrypt file\n'
-                  '  -k, --key KEY-FILE             private key to decrypt file\n'
+                  '  -k, --key KEY-FILE             private-key to decrypt file\n'
                   '  -H, --help                     print this help and exit\n')
 
             return

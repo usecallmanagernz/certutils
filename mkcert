@@ -1,11 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# Copyright (c) 2017-2020 Gareth Palmer <gareth.palmer3@gmail.com>
+# Copyright (c) 2020 Gareth Palmer <gareth.palmer3@gmail.com>
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2.
 
+set -o errexit
+set -o pipefail
+set -o unbound
+
 OPTIONS=$(getopt -n "${0##*/}" -o "c:o:u:l:s:C:b:E:y:d:f:H" \
-    -l "common:,organization:,unit:,locality:,state:,country:,bits:,curve:,years:,digest:,output:,help" -- "$@")
+    -l "common:,organization:,unit:,locality:,state:,country:,bits:,key-size:,curve:,years:,digest:,output:,help" -- "$@")
 
 if [[ $? -ne 0 ]]; then
     echo "Try '${0##*/} --help' for more information"
@@ -20,7 +24,7 @@ ORGANIZATIONAL_UNIT=""
 LOCALITY=""
 STATE=""
 COUNTRY=""
-BITS="2048"
+KEY_SIZE="2048"
 CURVE=""
 YEARS="10"
 DIGEST="sha256"
@@ -62,12 +66,12 @@ while true; do
             exit 1
         fi
         ;;
-    -b|--bits)
-        BITS="$1"
+    -b|--bits|--key-size)
+        KEY_SIZE="$1"
         shift 1
 
-        if [[ ! $BITS =~ ^[0-9]+$ || $BITS -lt 512 || $BITS -gt 4096 ]]; then
-            echo "Invalid bits: $BITS" >&2
+        if [[ ! $KEY_SIZE =~ ^[0-9]+$ || $KEY_SIZE -lt 512 || $KEY_SIZE -gt 4096 ]]; then
+            echo "Invalid bits: $KEY_SIZE" >&2
             exit 1
         fi
         ;;
@@ -113,8 +117,8 @@ while true; do
         echo "  -s, --state STATE                  state or province"
         echo "  -C, --country COUNTRY              country code"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
-        echo "  -b, --bits NUMBER                  RSA key size (default 2048)"
-        echo "  -E, --curve CURVE                  generate an EC key using curve instead of an RSA key"
+        echo "  -b, --bits, --key-size BITS        RSA key-size (default 2048)"
+        echo "  -E, --curve CURVE                  EC algorithm"
         echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
         echo "  -f, --file PEM-FILE                output file (default COMMON-NAME.pem)"
         echo "  -h, --help                         print this help and exit"
@@ -209,7 +213,7 @@ basicConstraints = critical, CA:true, pathlen:0
 keyUsage = Certificate Sign, CRL Sign, Digital Signature, Key Encipherment, Data Encipherment
 extendedKeyUsage = TLS Web Server Authentication, TLS Web Client Authentication, IPSec End System
 subjectKeyIdentifier = hash
-subjectAltName = DNS:$COMMON_NAME
+subjectAltName = DNS:${COMMON_NAME,,}
 EOF
 
 if [[ -n $CURVE ]]; then
@@ -219,7 +223,7 @@ if [[ -n $CURVE ]]; then
         exit 1
     fi
 else
-    if ! openssl genrsa -out "$TEMP_DIR/key.pem" "$BITS" 2> /dev/null; then
+    if ! openssl genrsa -out "$TEMP_DIR/key.pem" "$KEY_SIZE" 2> /dev/null; then
         echo "Error while generating RSA key" >&2
         exit 1
     fi
