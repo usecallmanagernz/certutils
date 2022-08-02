@@ -6,7 +6,7 @@
 
 set -o errexit
 set -o pipefail
-set -o unbound
+set -o nounset
 
 OPTIONS=$(getopt -n "${0##*/}" -o "c:o:u:l:s:C:b:E:y:d:f:H" \
     -l "common:,organization:,unit:,locality:,state:,country:,bits:,key-size:,curve:,years:,digest:,output:,help" -- "$@")
