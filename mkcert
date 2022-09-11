@@ -148,7 +148,7 @@ if [[ -z $ORGANIZATIONAL_UNIT ]]; then
 fi
 
 if [[ -z $OUTPUT_FILE ]]; then
-    OUTPUT_FILE="$1"
+    OUTPUT_FILE="${1:-}"
 
     if [[ -z $OUTPUT_FILE ]]; then
         OUTPUT_FILE=$(echo "$COMMON_NAME" | sed -e "s/[^A-Za-z0-9\.\-]/_/g").pem
