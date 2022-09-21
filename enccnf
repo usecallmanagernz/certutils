@@ -94,6 +94,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
     print(f'Header Length:               {header_length} bytes')
 
     hash_algorithm = None
+
     signature_index = 0
     signature_length = 0
 

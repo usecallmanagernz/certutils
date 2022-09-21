@@ -79,7 +79,7 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
 
     print(f'Header Length:    {header_length} bytes')
 
-    tftp_hash_algorithm = None
+    hash_algorithm = None
 
     signature_index = 0
     signature_length = 0
@@ -126,8 +126,6 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
                 print('SHA512')
             else:
                 print(f'{hash_algorithm}')
-
-            tftp_hash_algorithm = hash_algorithm
 
         elif tlv_tag in (HEADER_SIGNATURE_ALGORITHM, HEADER_SIGNATURE_MODULUS):
             pass
@@ -186,9 +184,9 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
 
     public_key = certificate.public_key()
 
-    if tftp_hash_algorithm == HASH_SHA1:
+    if hash_algorithm == HASH_SHA1:
         hash = hashes.SHA1()
-    elif tftp_hash_algorithm == HASH_SHA512:
+    elif hash_algorithm == HASH_SHA512:
         hash = hashes.SHA512()
 
     signature = tlv_data[signature_index + 3:signature_index + 3 + signature_length]
