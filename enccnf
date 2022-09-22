@@ -228,16 +228,11 @@ def parse_enc_file(enc_file, tftp_certificate_file):
 
     public_key = certificate.public_key()
 
-    if hash_algorithm == HASH_SHA1:
-        hash = hashes.SHA1()
-    elif hash_algorithm == HASH_SHA512:
-        hash = hashes.SHA512()
-
     signature = tlv_data[signature_index + 3:signature_index + 3 + signature_length]
     tlv_data = tlv_data[:signature_index] + tlv_data[signature_index + 3 + signature_length:]
 
     try:
-        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hash)
+        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == HASH_SHA512 else hashes.SHA1())
     except InvalidSignature:
         print('Invalid signature')
     else:
@@ -362,15 +357,10 @@ def remove_enc_file(enc_file, private_key_file):
     xml = decryptor.update(xml) + decryptor.finalize()
     xml = xml[:-encryption_padding]
 
-    if encryption_hash_algorithm == HASH_SHA1:
-        hash = hashes.SHA1()
-    elif encryption_hash_algorithm == HASH_SHA512:
-        hash = hashes.SHA512()
+    hash = hashes.Hash(hashes.SHA512() if encryption_hash_algorithm == HASH_SHA512 else hashes.SHA1(), backends.default_backend())
+    hash.update(xml)
 
-    digest = hashes.Hash(hash, backends.default_backend())
-    digest.update(xml)
-
-    xml_hash = digest.finalize()
+    xml_hash = hash.finalize()
     xml_hash = binascii.hexlify(xml_hash).decode('utf-8')
 
     if xml_hash != encryption_hash:
@@ -517,15 +507,10 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
 
-    if hash_algorithm == 'sha1':
-        hash = hashes.SHA1()
-    elif hash_algorithm == 'sha512':
-        hash = hashes.SHA512()
+    hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1(), backends.default_backend())
+    hash.update(xml)
 
-    digest = hashes.Hash(hash, backends.default_backend())
-    digest.update(xml)
-
-    encryption_hash = digest.finalize()
+    encryption_hash = hash.finalize()
 
     encryption_iv = os.urandom(16)
     encryption_key = os.urandom(16)
@@ -588,13 +573,8 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     tlv_data += xml
 
-    if hash_algorithm == 'sha1':
-        hash = hashes.SHA1()
-    elif hash_algorithm == 'sha512':
-        hash = hashes.SHA512()
-
     tlv_data = bytes(tlv_data)
-    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
+    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1())
 
     try:
         with open(enc_file, 'wb') as file:
@@ -693,13 +673,8 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     tlv_data += xml
 
-    if hash_algorithm == 'sha1':
-        hash = hashes.SHA1()
-    elif hash_algorithm == 'sha512':
-        hash = hashes.SHA512()
-
     tlv_data = bytes(tlv_data)
-    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
+    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1())
 
     try:
         with open(sgn_file, 'wb') as file:

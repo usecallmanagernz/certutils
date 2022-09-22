@@ -327,16 +327,11 @@ def parse_tlv_file(tlv_file):
 
     public_key = sast_certificate.public_key()
 
-    if hash_algorithm == HASH_SHA1:
-        hash = hashes.SHA1()
-    elif hash_algorithm == HASH_SHA512:
-        hash = hashes.SHA512()
-
     signature = tlv_data[signature_index + 3:signature_index + 3 + signature_length]
     tlv_data = tlv_data[:signature_index] + tlv_data[signature_index + 3 + signature_length:]
 
     try:
-        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hash)
+        public_key.verify(signature, tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == HASH_SHA512 else hashes.SHA1())
     except InvalidSignature:
         print('Invalid signature')
     else:
@@ -526,13 +521,8 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         record_length = len(tlv_data) - record_length_index
         struct.pack_into('> H', tlv_data, record_length_index + 3, record_length)
 
-    if hash_algorithm == 'sha1':
-        hash = hashes.SHA1()
-    elif hash_algorithm == 'sha512':
-        hash = hashes.SHA512()
-
     tlv_data = bytes(tlv_data)
-    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hash)
+    signature = private_key.sign(tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1())
 
     try:
         with open(tlv_file, 'wb') as file:

@@ -20,7 +20,7 @@ class ProgramError(Exception):
     pass
 
 
-def hash_certificate(certificate_file, digest_algorithm):
+def hash_certificate(certificate_file, hash_algorithm):
     try:
         with open(certificate_file, 'rb') as file:
             certificate = file.read()
@@ -33,17 +33,10 @@ def hash_certificate(certificate_file, digest_algorithm):
     except ValueError:
         raise ProgramError(f'No certificate in file: {certificate_file}')
 
-    if digest_algorithm == 'sha1':
-        hash = hashes.SHA1()
-    elif digest_algorithm == 'sha512':
-        hash = hashes.SHA512()
-    else:
-        raise ProgramError(f'Unsupported digest algorithm: {digest_algorithm}')
+    hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1(), backends.default_backend())
+    hash.update(certificate.public_bytes(serialization.Encoding.DER))
 
-    digest = hashes.Hash(hash, backends.default_backend())
-    digest.update(certificate.public_bytes(serialization.Encoding.DER))
-
-    certificate_hash = base64.b64encode(digest.finalize()).decode('utf-8')
+    certificate_hash = base64.b64encode(hash.finalize()).decode('utf-8')
 
     print(certificate_hash)
 
@@ -53,7 +46,7 @@ def main():
         short_options = 'd:H'
         long_options = ['digest=', 'help']
 
-        digest_algorithm = 'sha1'
+        hash_algorithm = 'sha1'
         certificate_file = None
         help = False
 
@@ -65,10 +58,10 @@ def main():
 
         for option, argument in options:
             if option in ('-d', '--digest'):
-                digest_algorithm = argument
+                hash_algorithm = argument
 
-                if digest_algorithm not in ('sha1', 'sha512'):
-                    raise ProgramError(f'Invalid digest: {digest_algorithm}')
+                if hash_algorithm not in ('sha1', 'sha512'):
+                    raise ProgramError(f'Invalid digest: {hash_algorithm}')
 
             elif option in ('-H', '--help'):
                 help = True
@@ -88,7 +81,7 @@ def main():
         if certificate_file is None:
             raise ProgramError('No certificate file specified')
 
-        hash_certificate(certificate_file, digest_algorithm)
+        hash_certificate(certificate_file, hash_algorithm)
 
     except ProgramError as error:
         print(str(error), file = sys.stderr)
