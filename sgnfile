@@ -308,14 +308,7 @@ def build_sgn_file(input_file, tftp_certificate_file, hash_algorithm, filename):
     tlv_data += issuer_name
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
-    tlv_data += struct.pack('> B H', HEADER_HASH_ALGORITHM, 1)
-
-    if hash_algorithm == 'sha1':
-        tlv_data.append(HASH_SHA1)
-    elif hash_algorithm == 'sha512':
-        tlv_data.append(HASH_SHA512)
-    else:
-        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
+    tlv_data += struct.pack('> B H B', HEADER_HASH_ALGORITHM, 1, HASH_SHA512 if hash_algorithm == 'sha512' else HASH_SHA1)
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_ALGORITHM_INFO, 8)
     tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_ALGORITHM, 1, 0)
