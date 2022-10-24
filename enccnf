@@ -312,7 +312,7 @@ def remove_enc_file(enc_file, private_key_file):
             encryption_iv = tlv_data[tlv_index:tlv_index + tlv_length]
 
         elif tlv_tag == HEADER_ENCRYPTION_PADDING:
-            (encryption_padding,) = struct.unpack_from('> H ', tlv_data, tlv_index)
+            (encryption_padding,) = struct.unpack_from('> H', tlv_data, tlv_index)
 
         elif tlv_tag == HEADER_ENCRYPTION_KEY:
             encryption_key = tlv_data[tlv_index:tlv_index + tlv_length]
