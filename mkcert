@@ -30,11 +30,9 @@ YEARS="10"
 DIGEST="sha256"
 OUTPUT_FILE=""
 
-while true; do
+while [[ -n $1 ]]; do
     OPTION="$1"
     shift 1
-
-    [[ -n $OPTION ]] || break
 
     case "$OPTION" in
     -c|--common)
@@ -151,7 +149,7 @@ if [[ -z $OUTPUT_FILE ]]; then
     OUTPUT_FILE="${1:-}"
 
     if [[ -z $OUTPUT_FILE ]]; then
-        OUTPUT_FILE=$(echo "$COMMON_NAME" | sed -e "s/[^A-Za-z0-9\.\-]/_/g").pem
+        OUTPUT_FILE="${COMMON_NAME//[^a-zA-Z0-9-]/_}.pem"
     fi
 fi
 
