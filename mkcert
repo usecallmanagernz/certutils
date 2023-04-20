@@ -217,7 +217,7 @@ EOF
 if [[ -n $CURVE ]]; then
     if ! openssl ecparam -name "$CURVE" -genkey -noout \
          -out "$TEMP_DIR/key.pem" 2> /dev/null; then
-        echo "Error while generaing EC key" >&2
+        echo "Error while generating EC key" >&2
         exit 1
     fi
 else
