@@ -24,6 +24,7 @@ on:
       - 'enccnf'
       - '.pylintrc'
       - '.github/workflows/pylint.yml'
+  workflow_dispatch:
 
 jobs:
   lint:
