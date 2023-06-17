@@ -18,6 +18,7 @@ on:
       - 'bash_completion'
       - '.shellcheckrc'
       - '.github/workflows/shellcheck.yml'
+
   workflow_dispatch:
 
 jobs:
