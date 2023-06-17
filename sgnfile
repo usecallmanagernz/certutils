@@ -158,7 +158,7 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
     print('')
 
     if hash_algorithm is None:
-        raise ProgramError(f'Missing HEADER_HASH_ALGORITHM')
+        raise ProgramError('Missing HEADER_HASH_ALGORITHM')
 
     if hash_algorithm not in (HASH_SHA1, HASH_SHA512):
         raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
