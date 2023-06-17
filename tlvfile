@@ -148,7 +148,7 @@ def parse_tlv_file(tlv_file):
         elif tlv_tag == HEADER_HASH_ALGORITHM:
             hash_algorithm = tlv_data[tlv_index]
 
-            print(f'Digest Algorithm: ', end = '')
+            print('Digest Algorithm: ', end = '')
 
             if hash_algorithm == HASH_SHA1:
                 print('SHA1')
@@ -188,10 +188,10 @@ def parse_tlv_file(tlv_file):
     print('')
 
     if sast_serial_number is None:
-        raise ProgramError(f'Missing HEADER_SERIAL_NUMBER')
+        raise ProgramError('Missing HEADER_SERIAL_NUMBER')
 
     if hash_algorithm is None:
-        raise ProgramError(f'Missing HEADER_HASH_ALGORITHM')
+        raise ProgramError('Missing HEADER_HASH_ALGORITHM')
 
     if hash_algorithm not in (HASH_SHA1, HASH_SHA512):
         raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
@@ -238,7 +238,7 @@ def parse_tlv_file(tlv_file):
             elif tlv_tag == RECORD_ROLE:
                 (role,) = struct.unpack_from('> H', tlv_data, tlv_index)
 
-                print(f'Role:             ', end = '')
+                print('Role:             ', end = '')
 
                 if role == ROLE_SAST:
                     print('SAST')

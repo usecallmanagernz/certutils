@@ -133,7 +133,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
         elif tlv_tag == HEADER_HASH_ALGORITHM:
             hash_algorithm = tlv_data[tlv_index]
 
-            print(f'Digest Algorithm:            ', end = '')
+            print('Digest Algorithm:            ', end = '')
 
             if hash_algorithm == HASH_SHA1:
                 print('SHA1')
@@ -179,7 +179,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
         elif tlv_tag == HEADER_ENCRYPTION_HASH_ALGORITHM:
             encryption_hash_algorithm = tlv_data[tlv_index]
 
-            print(f'Encryption Digest Algorithm: ', end = '')
+            print('Encryption Digest Algorithm: ', end = '')
 
             if encryption_hash_algorithm == HASH_SHA1:
                 print('SHA1')
@@ -202,7 +202,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
     print('')
 
     if hash_algorithm is None:
-        raise ProgramError(f'Missing HEADER_HASH_ALGORITHM')
+        raise ProgramError('Missing HEADER_HASH_ALGORITHM')
 
     if hash_algorithm not in (HASH_SHA1, HASH_SHA512):
         raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
@@ -270,7 +270,7 @@ def remove_enc_file(enc_file, private_key_file):
     if tlv_tag != HEADER_VERSION:
         raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
+    # Skip version
     tlv_index += tlv_length
 
     (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
@@ -748,7 +748,7 @@ def main():
 
             elif mode == 'remove':
                 if private_key_file is None:
-                    raise ProgramError(f'No private-key file specified')
+                    raise ProgramError('No private-key file specified')
 
                 remove_enc_file(enc_file, private_key_file)
 

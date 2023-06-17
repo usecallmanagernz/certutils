@@ -118,7 +118,7 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
         elif tlv_tag == HEADER_HASH_ALGORITHM:
             hash_algorithm = tlv_data[tlv_index]
 
-            print(f'Digest Algorithm: ', end = '')
+            print('Digest Algorithm: ', end = '')
 
             if hash_algorithm == HASH_SHA1:
                 print('SHA1')
@@ -211,7 +211,7 @@ def remove_sgn_file(sgn_file):
     if tlv_tag != HEADER_VERSION:
         raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
 
-    (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
+    # Skip version
     tlv_index += tlv_length
 
     (tlv_tag, tlv_length) = struct.unpack_from('> B H', tlv_data, tlv_index)
