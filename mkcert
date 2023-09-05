@@ -7,6 +7,7 @@
 set -o errexit
 set -o pipefail
 set -o nounset
+shopt -s extglob
 
 OPTIONS=$(getopt -n "${0##*/}" -o "c:o:u:l:s:C:b:E:y:d:f:H" \
     -l "common:,organization:,unit:,locality:,state:,country:,bits:,key-size:,curve:,years:,digest:,output:,help" -- "$@")
@@ -95,7 +96,7 @@ while [[ -n $1 ]]; do
         DIGEST="$1"
         shift 1
 
-        if [[ $DIGEST != +(sha1|sha256|sha512) ]]; then
+        if [[ $DIGEST != @(sha1|sha256|sha512) ]]; then
             echo "Invaid digest: $DIGEST" >&2
             exit 1
         fi
@@ -110,14 +111,14 @@ while [[ -n $1 ]]; do
         echo ""
         echo "  -c, --common COMMON-NAME           common name, required"
         echo "  -o, --organization ORGANIZATION    organization, required"
-        echo "  -u, --unit UNIT                    organizational unit"
+        echo "  -u, --unit UNIT                    organizational unit, required"
         echo "  -l, --locality LOCALITY            locality"
         echo "  -s, --state STATE                  state or province"
         echo "  -C, --country COUNTRY              country code"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
         echo "  -b, --bits, --key-size BITS        RSA key-size (default 2048)"
         echo "  -E, --curve CURVE                  EC algorithm"
-        echo "  -d, --digest DIGEST                message digest to use: md5, sha1, sha256 or sha512 (default sha256)"
+        echo "  -d, --digest DIGEST                message digest to use: sha1, sha256 or sha512 (default sha256)"
         echo "  -f, --file PEM-FILE                output file (default COMMON-NAME.pem)"
         echo "  -h, --help                         print this help and exit"
         echo ""
