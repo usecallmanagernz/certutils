@@ -2,7 +2,7 @@
 
 # Certificate Utilities
 
-Utilities to manage .tlv and .sgn files.
+Utilities to manage .tlv, .sgn and .enc.sgn files.
 
 * `tlvfile` - Parse or build .tlv files (eg: ITLFile.tlv).
 * `sgnfile` - Parse or build .sgn files.
