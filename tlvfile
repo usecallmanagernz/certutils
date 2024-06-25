@@ -163,7 +163,7 @@ def parse_tlv_file(tlv_file):
         elif tlv_tag == HEADER_SIGNATURE:
             signature = tlv_data[tlv_index:tlv_index + tlv_length]
 
-            print(f'Signature:        {tlv_length} bytes')
+            print(f'Signature:        {len(signature)} bytes')
 
             signature_index = tlv_index - 3
             signature_length = tlv_length
@@ -272,17 +272,17 @@ def parse_tlv_file(tlv_file):
             elif tlv_tag == RECORD_PUBLIC_KEY:
                 public_key = tlv_data[tlv_index:tlv_index + tlv_length]
 
-                print(f'Public Key:       {tlv_length} bytes')
+                print(f'Public Key:       {len(public_key)} bytes')
 
             elif tlv_tag == RECORD_SIGNATURE:
                 signature = tlv_data[tlv_index:tlv_index + tlv_length]
 
-                print(f'Signature:        {tlv_length} bytes')
+                print(f'Signature:        {len(signature)} bytes')
 
             elif tlv_tag == RECORD_CERTIFICATE:
                 certificate = tlv_data[tlv_index:tlv_index + tlv_length]
 
-                print(f'Certificate:      {tlv_length} bytes')
+                print(f'Certificate:      {len(certificate)} bytes')
 
                 try:
                     certificate = x509.load_der_x509_certificate(certificate, backends.default_backend())
