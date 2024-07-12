@@ -80,7 +80,6 @@ def parse_sgn_file(sgn_file, tftp_certificate_file):
     print(f'Header Length:    {header_length} bytes')
 
     hash_algorithm = None
-
     signature_index = 0
     signature_length = 0
 
@@ -295,17 +294,17 @@ def build_sgn_file(input_file, tftp_certificate_file, hash_algorithm, filename):
     serial_number = certificate.serial_number
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-    signer_info = 3 + len(signer_name) + 3 + len(serial_number) + 3 + len(issuer_name)
-    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, signer_info)
+    signer_info = struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
+    signer_info += signer_name
 
-    tlv_data += struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
-    tlv_data += signer_name
+    signer_info += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
+    signer_info += serial_number
 
-    tlv_data += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
-    tlv_data += serial_number
+    signer_info += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
+    signer_info += issuer_name
 
-    tlv_data += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
-    tlv_data += issuer_name
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info))
+    tlv_data += signer_info
 
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H B', HEADER_HASH_ALGORITHM, 1, HASH_SHA512 if hash_algorithm == 'sha512' else HASH_SHA1)
@@ -314,7 +313,9 @@ def build_sgn_file(input_file, tftp_certificate_file, hash_algorithm, filename):
     tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_ALGORITHM, 1, 0)
     tlv_data += struct.pack('> B H B', HEADER_SIGNATURE_MODULUS, 1, [64, 128, 256, 512].index(signature_length))
 
+    # Index where the signature will be inserted
     signature_index = len(tlv_data)
+
     filename = filename.encode('utf-8') + b'\x00'
 
     tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename))
@@ -337,7 +338,8 @@ def build_sgn_file(input_file, tftp_certificate_file, hash_algorithm, filename):
     try:
         with open(sgn_file, 'wb') as file:
             file.write(tlv_data[:signature_index])
-            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)))
+            file.write(signature)
             file.write(tlv_data[signature_index:])
 
     except (PermissionError, IsADirectoryError) as error:
