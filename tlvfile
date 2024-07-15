@@ -82,7 +82,7 @@ def parse_tlv_file(tlv_file):
     tlv_index += 3
 
     if tlv_tag != HEADER_VERSION:
-        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
+        raise ProgramError(f'Tag is not header version: {tlv_tag}')
 
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -94,7 +94,7 @@ def parse_tlv_file(tlv_file):
     tlv_index += 3
 
     if tlv_tag != HEADER_LENGTH:
-        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
+        raise ProgramError(f'Tag is not header length: {tlv_tag}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -102,9 +102,10 @@ def parse_tlv_file(tlv_file):
     print(f'Header Length:    {header_length} bytes')
 
     sast_serial_number = None
+    sast_certificate = None
     hash_algorithm = None
-    signature_index = 0
-    signature_length = 0
+    signature_index = None
+    signature_length = None
 
     while tlv_index < header_length:
         tlv_tag = tlv_data[tlv_index]
@@ -180,25 +181,23 @@ def parse_tlv_file(tlv_file):
             print(timestamp.strftime('Timestamp:        %Y-%m-%d %H:%M:%S'))
 
         else:
-            raise ProgramError(f'Unknown HEADER tag: {tlv_tag}')
+            raise ProgramError(f'Unknown header tag: {tlv_tag}')
 
         tlv_index += tlv_length
 
     print('')
 
     if sast_serial_number is None:
-        raise ProgramError('Missing HEADER_SERIAL_NUMBER')
+        raise ProgramError('Missing header serial number')
 
     if hash_algorithm is None:
-        raise ProgramError('Missing HEADER_HASH_ALGORITHM')
+        raise ProgramError('Missing header hash algorithm')
 
     if hash_algorithm not in (HASH_SHA1, HASH_SHA512):
-        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
+        raise ProgramError(f'Unsupported header hash algorithm: {hash_algorithm}')
 
     if signature_index is None:
-        raise ProgramError('Missing HEADER_SIGNATURE')
-
-    sast_certificate = None
+        raise ProgramError('Missing header signature')
 
     while tlv_index < len(tlv_data):
         record_index = tlv_index
@@ -207,7 +206,7 @@ def parse_tlv_file(tlv_file):
         tlv_index += 3
 
         if tlv_tag != RECORD_LENGTH:
-            raise ProgramError(f'Tag is not RECORD_LENGTH: {tlv_tag}')
+            raise ProgramError(f'Tag is not record length: {tlv_tag}')
 
         (record_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
         tlv_index += tlv_length
@@ -295,7 +294,7 @@ def parse_tlv_file(tlv_file):
                 elif isinstance(public_key, ec.EllipticCurvePublicKey):
                     print('Key Algorithm:    EC')
                 else:
-                    raise ProgramError('Unsupported RECORD_CERTIFICATE type')
+                    raise ProgramError('Unsupported record certificate type')
 
                 certificate_hash = certificate.fingerprint(hashes.SHA1())
                 certificate_hash = binascii.hexlify(certificate_hash).decode('utf-8')
@@ -312,7 +311,7 @@ def parse_tlv_file(tlv_file):
                 pass
 
             else:
-                raise ProgramError(f'Unknown RECORD tag: {tlv_tag}')
+                raise ProgramError(f'Unknown record tag: {tlv_tag}')
 
             tlv_index += tlv_length
 
@@ -322,7 +321,7 @@ def parse_tlv_file(tlv_file):
         print('')
 
     if sast_certificate is None:
-        raise ProgramError('Missing RECORD with ROLE_SAST')
+        raise ProgramError('Missing record with role SAST')
 
     public_key = sast_certificate.public_key()
 
@@ -474,7 +473,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         elif role == 'TVS':
             tlv_data += struct.pack('> H', ROLE_TVS)
         else:
-            raise ProgramError(f'Unsupported RECORD_ROLE: {role}')
+            raise ProgramError(f'Unsupported record role: {role}')
 
         issuer_name = ''
 
@@ -495,7 +494,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         elif isinstance(public_key, ec.EllipticCurvePublicKey):
             public_key = public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
         else:
-            raise ProgramError('Unsupported certificate PUBLIC_KEY type')
+            raise ProgramError('Unsupported certificate public-key type')
 
         tlv_data += struct.pack('> B H', RECORD_PUBLIC_KEY, len(public_key))
         tlv_data += public_key

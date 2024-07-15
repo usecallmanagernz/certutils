@@ -74,7 +74,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
     tlv_index += 3
 
     if tlv_tag != HEADER_VERSION:
-        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
+        raise ProgramError(f'Tag is not header version: {tlv_tag}')
 
     (major, minor) = struct.unpack_from('B B', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -86,7 +86,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
     tlv_index += 3
 
     if tlv_tag != HEADER_LENGTH:
-        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
+        raise ProgramError(f'Tag is not header length: {tlv_tag}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -94,8 +94,8 @@ def parse_enc_file(enc_file, tftp_certificate_file):
     print(f'Header Length:               {header_length} bytes')
 
     hash_algorithm = None
-    signature_index = 0
-    signature_length = 0
+    signature_index = None
+    signature_length = None
 
     while tlv_index < header_length:
         tlv_tag = tlv_data[tlv_index]
@@ -198,20 +198,20 @@ def parse_enc_file(enc_file, tftp_certificate_file):
             print(f'Encryption Digest:           {encryption_hash}')
 
         else:
-            raise ProgramError(f'Unknown HEADER tag: {tlv_tag}')
+            raise ProgramError(f'Unknown header tag: {tlv_tag}')
 
         tlv_index += tlv_length
 
     print('')
 
     if hash_algorithm is None:
-        raise ProgramError('Missing HEADER_HASH_ALGORITHM')
+        raise ProgramError('Missing header hash algorithm')
 
     if hash_algorithm not in (HASH_SHA1, HASH_SHA512):
-        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {hash_algorithm}')
+        raise ProgramError(f'Unsupported header hash algorithm: {hash_algorithm}')
 
     if signature_index is None:
-        raise ProgramError('Missing HEADER_SIGNATURE')
+        raise ProgramError('Missing header signature')
 
     if tftp_certificate_file is None:
         print('No certificate specified, unable to check signature')
@@ -271,7 +271,7 @@ def remove_enc_file(enc_file, private_key_file):
     tlv_index += 3
 
     if tlv_tag != HEADER_VERSION:
-        raise ProgramError(f'Tag is not HEADER_VERSION: {tlv_tag}')
+        raise ProgramError(f'Tag is not header version: {tlv_tag}')
 
     tlv_index += tlv_length
 
@@ -279,7 +279,7 @@ def remove_enc_file(enc_file, private_key_file):
     tlv_index += 3
 
     if tlv_tag != HEADER_LENGTH:
-        raise ProgramError(f'Tag is not HEADER_LENGTH: {tlv_tag}')
+        raise ProgramError(f'Tag is not header length: {tlv_tag}')
 
     (header_length,) = struct.unpack_from('> H', tlv_data, tlv_index)
     tlv_index += tlv_length
@@ -327,24 +327,24 @@ def remove_enc_file(enc_file, private_key_file):
             encryption_hash = binascii.hexlify(encryption_hash).decode('utf-8')
 
         else:
-            raise ProgramError(f'Unknown HEADER tag: {tlv_tag}')
+            raise ProgramError(f'Unknown header tag: {tlv_tag}')
 
         tlv_index += tlv_length
 
     if encryption_iv is None:
-        raise ProgramError('Missing HEADER_ENCRYPTION_IV')
+        raise ProgramError('Missing header encryption IV')
 
     if encryption_key is None:
-        raise ProgramError('Missing HEADER_ENCRYPTION_KEY')
+        raise ProgramError('Missing header encryption key')
 
     if encryption_hash_algorithm is None:
-        raise ProgramError(f'Missing HEADER_ENCRYPTION_HASH_ALGORITHM: {encryption_hash_algorithm}')
+        raise ProgramError(f'Missing header encryption hash algorithm: {encryption_hash_algorithm}')
 
     if encryption_hash_algorithm not in (HASH_SHA1, HASH_SHA512):
-        raise ProgramError(f'Unsupported HEADER_HASH_ALGORITHM: {encryption_hash_algorithm}')
+        raise ProgramError(f'Unsupported header encryption hash algorithm: {encryption_hash_algorithm}')
 
     if encryption_hash is None:
-        raise ProgramError('Missing HEADER_ENCRYPTION_HASH')
+        raise ProgramError('Missing header encryption hash')
 
     xml = tlv_data[header_length:]
 
