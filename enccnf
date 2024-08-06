@@ -236,10 +236,10 @@ def parse_enc_file(enc_file, tftp_certificate_file):
 
     try:
         public_key.verify(signature, tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == HASH_SHA512 else hashes.SHA1())
+
+        print('Valid signature')
     except InvalidSignature:
         print('Invalid signature')
-    else:
-        print('Valid signature')
 
 
 def remove_enc_file(enc_file, private_key_file):
@@ -459,34 +459,17 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     header_length_index = len(tlv_data)
     tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
 
-    signer_name = ''
-
-    for attribute in certificate.subject:
-        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
-
-    signer_name = signer_name.encode('utf-8') + b'\x00'
-    issuer_name = ''
-
-    for attribute in certificate.issuer:
-        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
-
-    issuer_name = issuer_name.encode('utf-8') + b'\x00'
+    signer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.subject]).encode('utf-8') + b'\x00'
+    issuer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.issuer]).encode('utf-8') + b'\x00'
 
     serial_number = certificate.serial_number
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-    signer_info = struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
-    signer_info += signer_name
+    signer_info = (struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name)) + signer_name +
+                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name +
+                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number)
 
-    signer_info += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
-    signer_info += serial_number
-
-    signer_info += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
-    signer_info += issuer_name
-
-    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info))
-    tlv_data += signer_info
-
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info)) + signer_info
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H B', HEADER_HASH_ALGORITHM, 1, HASH_SHA512 if hash_algorithm == 'sha512' else HASH_SHA1)
 
@@ -499,9 +482,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     filename = os.path.basename(enc_file).encode('utf-8') + b'\x00'
 
-    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename))
-    tlv_data += filename
-
+    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename)) + filename
     tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
 
     hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1(), backends.default_backend())
@@ -522,33 +503,21 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     xml = encryptor.update(xml) + encryptor.finalize()
     encryption_key = device_public_key.encrypt(encryption_key, padding.PKCS1v15())
 
-    encryption_iv_info = struct.pack('> B H B', HEADER_ENCRYPTION_UNKNOWN1, 1, 0)
+    encryption_iv_info = (struct.pack('> B H B', HEADER_ENCRYPTION_UNKNOWN1, 1, 0) +
+                          struct.pack('> B H', HEADER_ENCRYPTION_IV, len(encryption_iv)) + encryption_iv +
+                          struct.pack('> B H H', HEADER_ENCRYPTION_PADDING, 2, encryption_padding))
 
-    encryption_iv_info += struct.pack('> B H', HEADER_ENCRYPTION_IV, len(encryption_iv))
-    encryption_iv_info += encryption_iv
+    encryption_key_info = (struct.pack('> B H B', HEADER_ENCRYPTION_UNKNOWN2, 1, 0) +
+                           struct.pack('> B H H', HEADER_ENCRYPTION_KEY_SIZE, 2, len(encryption_key) * 8) +
+                           struct.pack('> B H B', HEADER_ENCRYPTION_KEY_ALGORITHM, 1, 1) + # AES?
+                           struct.pack('> B H', HEADER_ENCRYPTION_KEY, len(encryption_key)) + encryption_key)
 
-    encryption_iv_info += struct.pack('> B H H', HEADER_ENCRYPTION_PADDING, 2, encryption_padding)
+    encryption_info = (struct.pack('> B H', HEADER_ENCRYPTION_IV_INFO, len(encryption_iv_info)) + encryption_iv_info +
+                       struct.pack('> B H', HEADER_ENCRYPTION_KEY_INFO, len(encryption_key_info)) + encryption_key_info)
 
-    encryption_key_info = struct.pack('> B H B', HEADER_ENCRYPTION_UNKNOWN2, 1, 0)
-    encryption_key_info += struct.pack('> B H H', HEADER_ENCRYPTION_KEY_SIZE, 2, len(encryption_key) * 8)
-    encryption_key_info += struct.pack('> B H B', HEADER_ENCRYPTION_KEY_ALGORITHM, 1, 1) # AES?
-
-    encryption_key_info += struct.pack('> B H', HEADER_ENCRYPTION_KEY, len(encryption_key))
-    encryption_key_info += encryption_key
-
-    encryption_info = struct.pack('> B H', HEADER_ENCRYPTION_IV_INFO, len(encryption_iv_info))
-    encryption_info += encryption_iv_info
-
-    encryption_info += struct.pack('> B H', HEADER_ENCRYPTION_KEY_INFO, len(encryption_key_info))
-    encryption_info += encryption_key_info
-
-    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_INFO, len(encryption_info))
-    tlv_data += encryption_info
-
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_INFO, len(encryption_info)) + encryption_info
     tlv_data += struct.pack('> B H B', HEADER_ENCRYPTION_HASH_ALGORITHM, 1, HASH_SHA512 if hash_algorithm == 'sha512' else HASH_SHA1)
-
-    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_HASH, len(encryption_hash))
-    tlv_data += encryption_hash
+    tlv_data += struct.pack('> B H', HEADER_ENCRYPTION_HASH, len(encryption_hash)) + encryption_hash
 
     # Pad to 4 byte boundary
     while (len(tlv_data) + 3 + signature_length) % 4:
@@ -565,8 +534,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     try:
         with open(enc_file, 'wb') as file:
             file.write(tlv_data[:signature_index])
-            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)))
-            file.write(signature)
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
             file.write(tlv_data[signature_index:])
 
     except (PermissionError, IsADirectoryError) as error:
@@ -601,34 +569,17 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     header_length_index = len(tlv_data)
     tlv_data += struct.pack('> B H H', HEADER_LENGTH, 2, 0)
 
-    signer_name = ''
-
-    for attribute in certificate.subject:
-        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
-
-    signer_name = signer_name.encode('utf-8') + b'\x00'
-    issuer_name = ''
-
-    for attribute in certificate.issuer:
-        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
-
-    issuer_name = issuer_name.encode('utf-8') + b'\x00'
+    signer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.subject]).encode('utf-8') + b'\x00'
+    issuer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.issuer]).encode('utf-8') + b'\x00'
 
     serial_number = certificate.serial_number
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-    signer_info = struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
-    signer_info += signer_name
+    signer_info = (struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name)) + signer_name +
+                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name +
+                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number)
 
-    signer_info += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
-    signer_info += serial_number
-
-    signer_info += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
-    signer_info += issuer_name
-
-    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info))
-    tlv_data += signer_info
-
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info)) + signer_info
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H B', HEADER_HASH_ALGORITHM, 1, HASH_SHA512 if hash_algorithm == 'sha512' else HASH_SHA1)
 
@@ -641,9 +592,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
 
     filename = os.path.basename(sgn_file).encode('utf-8') + b'\x00'
 
-    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename))
-    tlv_data += filename
-
+    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename)) + filename
     tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
 
     # Pad to 4 byte boundary
@@ -661,8 +610,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     try:
         with open(sgn_file, 'wb') as file:
             file.write(tlv_data[:signature_index])
-            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)))
-            file.write(signature)
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
             file.write(tlv_data[signature_index:])
 
     except (PermissionError, IsADirectoryError) as error:

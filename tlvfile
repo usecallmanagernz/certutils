@@ -330,10 +330,10 @@ def parse_tlv_file(tlv_file):
 
     try:
         public_key.verify(signature, tlv_data, padding.PKCS1v15(), hashes.SHA512() if hash_algorithm == HASH_SHA512 else hashes.SHA1())
+
+        print('Valid signature')
     except InvalidSignature:
         print('Invalid signature')
-    else:
-        print('Valid signature')
 
 
 def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, filename, certificate_records):
@@ -373,34 +373,17 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
     (major, minor) = version.split('.')
     tlv_data += struct.pack('> B H B B', HEADER_SIGNER_VERSION, 2, int(major), int(minor))
 
-    signer_name = ''
-
-    for attribute in certificate.subject:
-        signer_name += (';' if len(signer_name) else '') + attribute.rfc4514_string()
-
-    signer_name = signer_name.encode('utf-8') + b'\x00'
-    issuer_name = ''
-
-    for attribute in certificate.issuer:
-        issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
-
-    issuer_name = issuer_name.encode('utf-8') + b'\x00'
+    signer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.subject]).encode('utf-8') + b'\x00'
+    issuer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.issuer]).encode('utf-8') + b'\x00'
 
     serial_number = certificate.serial_number
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-    signer_info = struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name))
-    signer_info += signer_name
+    signer_info = (struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name)) + signer_name +
+                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name +
+                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number)
 
-    signer_info += struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number))
-    signer_info += serial_number
-
-    signer_info += struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name))
-    signer_info += issuer_name
-
-    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info))
-    tlv_data += signer_info
-
+    tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info)) + signer_info
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
     tlv_data += struct.pack('> B H B', HEADER_HASH_ALGORITHM, 1, HASH_SHA512 if hash_algorithm == 'sha512' else HASH_SHA1)
 
@@ -410,12 +393,9 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
 
     # Index where the signature will be inserted
     signature_index = len(tlv_data)
-
     filename = filename.encode('utf-8') + b'\x00'
 
-    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename))
-    tlv_data += filename
-
+    tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename)) + filename
     tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
 
     # Pad to 4 byte boundary
@@ -446,15 +426,15 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         record_length_index = len(tlv_data)
         tlv_data += struct.pack('> B H H', RECORD_LENGTH, 2, 0)
 
-        subject_name = ''
+        subject_name = ','.join([attribute.rfc4514_string() for attribute in certificate.subject]).encode('utf-8') + b'\x00'
+        issuer_name = ','.join([attribute.rfc4514_string() for attribute in certificate.issuer]).encode('utf-8') + b'\x00'
 
-        for attribute in certificate.subject:
-            subject_name += (';' if len(subject_name) else '') + attribute.rfc4514_string()
+        serial_number = certificate.serial_number
+        serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
-        subject_name = subject_name.encode('utf-8') + b'\x00'
-
-        tlv_data += struct.pack('> B H', RECORD_SUBJECT_NAME, len(subject_name))
-        tlv_data += subject_name
+        tlv_data += struct.pack('> B H', RECORD_SUBJECT_NAME, len(subject_name)) + subject_name
+        tlv_data += struct.pack('> B H', RECORD_ISSUER_NAME, len(issuer_name)) + issuer_name
+        tlv_data += struct.pack('> B H', RECORD_SERIAL_NUMBER, len(serial_number)) + serial_number
 
         tlv_data += struct.pack('> B H', RECORD_ROLE, 2)
 
@@ -475,20 +455,6 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         else:
             raise ProgramError(f'Unsupported record role: {role}')
 
-        issuer_name = ''
-
-        for attribute in certificate.issuer:
-            issuer_name += (';' if len(issuer_name) else '') + attribute.rfc4514_string()
-
-        issuer_name = issuer_name.encode('utf-8') + b'\x00'
-        tlv_data += struct.pack('> B H', RECORD_ISSUER_NAME, len(issuer_name)) + issuer_name
-
-        serial_number = certificate.serial_number
-        serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
-
-        tlv_data += struct.pack('> B H', RECORD_SERIAL_NUMBER, len(serial_number))
-        tlv_data += serial_number
-
         if isinstance(public_key, rsa.RSAPublicKey):
             public_key = public_key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.PKCS1)
         elif isinstance(public_key, ec.EllipticCurvePublicKey):
@@ -496,18 +462,13 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         else:
             raise ProgramError('Unsupported certificate public-key type')
 
-        tlv_data += struct.pack('> B H', RECORD_PUBLIC_KEY, len(public_key))
-        tlv_data += public_key
+        tlv_data += struct.pack('> B H', RECORD_PUBLIC_KEY, len(public_key)) + public_key
 
         signature = certificate.signature
-
-        tlv_data += struct.pack('> B H', RECORD_SIGNATURE, len(signature))
-        tlv_data += signature
-
         certificate = certificate.public_bytes(serialization.Encoding.DER)
 
-        tlv_data += struct.pack('> B H', RECORD_CERTIFICATE, len(certificate))
-        tlv_data += certificate
+        tlv_data += struct.pack('> B H', RECORD_SIGNATURE, len(signature)) + signature
+        tlv_data += struct.pack('> B H', RECORD_CERTIFICATE, len(certificate)) + certificate
 
         record_length = len(tlv_data) - record_length_index
         struct.pack_into('> H', tlv_data, record_length_index + 3, record_length)
@@ -518,8 +479,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
     try:
         with open(tlv_file, 'wb') as file:
             file.write(tlv_data[:signature_index])
-            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)))
-            file.write(signature)
+            file.write(struct.pack('> B H', HEADER_SIGNATURE, len(signature)) + signature)
             file.write(tlv_data[signature_index:])
 
     except (PermissionError, IsADirectoryError) as error:

@@ -106,7 +106,7 @@ while [[ -n $1 ]]; do
         shift 1
         ;;
     -H|--help)
-        echo "Usage: ${0##*/} [OPTIONS] [PEM-FILE]"
+        echo "Usage: ${0##*/} [OPTIONS] [FILE]"
         echo "Create a self-signed X509 certificate."
         echo ""
         echo "  -c, --common COMMON-NAME           common name, required"
@@ -117,9 +117,9 @@ while [[ -n $1 ]]; do
         echo "  -C, --country COUNTRY              country code"
         echo "  -y, --years NUMBER                 number of years to sign the certificate (default 10)"
         echo "  -b, --bits, --key-size BITS        RSA key-size (default 2048)"
-        echo "  -E, --curve CURVE                  EC algorithm"
+        echo "  -E, --curve CURVE                  EC name (secp256r1, secpr384r1 or secp512r1)"
         echo "  -d, --digest DIGEST                message digest to use: sha1, sha256 or sha512 (default sha256)"
-        echo "  -f, --file PEM-FILE                output file (default COMMON-NAME.pem)"
+        echo "  -f, --file FILE                    output file (default COMMON-NAME.pem)"
         echo "  -h, --help                         print this help and exit"
         echo ""
 
