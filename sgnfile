@@ -297,6 +297,7 @@ def build_sgn_file(input_file, tftp_certificate_file, hash_algorithm, filename):
 
     # Index where the signature will be inserted
     signature_index = len(tlv_data)
+
     filename = filename.encode('utf-8') + b'\x00'
 
     tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename)) + filename

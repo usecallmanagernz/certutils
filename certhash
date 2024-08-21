@@ -36,9 +36,9 @@ def hash_certificate(certificate_file, hash_algorithm):
     hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1(), backends.default_backend())
     hash.update(certificate.public_bytes(serialization.Encoding.DER))
 
-    certificate_hash = base64.b64encode(hash.finalize()).decode('utf-8')
+    certificate_hash = hash.finalize()
 
-    print(certificate_hash)
+    print(base64.b64encode(certificate_hash).decode('utf-8'))
 
 
 def main():

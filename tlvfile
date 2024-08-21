@@ -393,6 +393,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
 
     # Index where the signature will be inserted
     signature_index = len(tlv_data)
+
     filename = filename.encode('utf-8') + b'\x00'
 
     tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename)) + filename
