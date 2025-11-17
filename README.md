@@ -11,7 +11,7 @@ Utilities to manage .tlv, .sgn and .enc.sgn files.
 * `enccnf` - Encrypt or decrypt SEPMAC.cnf.xml files.
 * `mkcert` - Make self-signed X509 certificates.
 
-See [Device Security](http://usecallmanager.nz/device-security.html) for
+See [Device Security](https://usecallmanager.nz/device-security.html) for
 example usage.
 
 ## Requirements
