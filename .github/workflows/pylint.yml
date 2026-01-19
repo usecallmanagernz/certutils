@@ -5,25 +5,28 @@ on:
     branches:
       - master
     paths:
-      - 'certhash'
-      - 'sgnfile'
-      - 'stripsgn'
-      - 'tlvfile'
-      - 'enccnf'
-      - '.pylintrc'
-      - '.github/workflows/pylint.yml'
+      - "certhash"
+      - "sgnfile"
+      - "stripsgn"
+      - "tlvfile"
+      - "enccnf"
+      - ".pylintrc"
+      - ".github/workflows/pylint.yml"
 
   pull_request:
     branches:
       - master
     paths:
-      - 'certhash'
-      - 'sgnfile'
-      - 'stripsgn'
-      - 'tlvfile'
-      - 'enccnf'
-      - '.pylintrc'
-      - '.github/workflows/pylint.yml'
+      - "certhash"
+      - "sgnfile"
+      - "stripsgn"
+      - "tlvfile"
+      - "enccnf"
+      - ".pylintrc"
+      - ".github/workflows/pylint.yml"
+
+  schedule:
+    - cron: "0 8 1 * *"
 
   workflow_dispatch:
 
