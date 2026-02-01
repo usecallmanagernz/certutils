@@ -167,9 +167,9 @@ echo "$SERIAL_NUMBER" > "$TEMP_DIR/serial.txt"
 
 cat >> "$TEMP_DIR/openssl.cnf" <<EOF
 [ca]
-default_ca = ca_default
+default_ca = default_ca
 
-[ca_default]
+[default_ca]
 new_certs_dir = $TEMP_DIR
 database = $TEMP_DIR/database.txt
 serial = $TEMP_DIR/serial.txt
@@ -179,13 +179,13 @@ default_md = $DIGEST
 certificate = $TEMP_DIR/crt.pem
 private_key = $TEMP_DIR/key.pem
 x509_extensions = x509_extensions
-policy = policy_default
+policy = policy
 copy_extensions = none
 email_in_dn = yes
 preserve = no
 unique_subject = no
 
-[policy_default]
+[policy]
 commonName = supplied
 organizationName = supplied
 organizationalUnitName = supplied
