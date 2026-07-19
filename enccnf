@@ -466,8 +466,8 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
     signer_info = (struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name)) + signer_name +
-                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name +
-                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number)
+                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number +
+                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name)
 
     tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info)) + signer_info
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
@@ -576,8 +576,8 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     serial_number = serial_number.to_bytes((serial_number.bit_length() + 7) // 8, byteorder = 'big')
 
     signer_info = (struct.pack('> B H', HEADER_SIGNER_NAME, len(signer_name)) + signer_name +
-                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name +
-                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number)
+                   struct.pack('> B H', HEADER_SERIAL_NUMBER, len(serial_number)) + serial_number +
+                   struct.pack('> B H', HEADER_ISSUER_NAME, len(issuer_name)) + issuer_name)
 
     tlv_data += struct.pack('> B H', HEADER_SIGNER_INFO, len(signer_info)) + signer_info
     tlv_data += struct.pack('> B H', HEADER_SIGNATURE_INFO, 15)
