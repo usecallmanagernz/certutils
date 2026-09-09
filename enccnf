@@ -561,7 +561,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     document.clear()
     document.extend(elements)
 
-    xml = b'<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(document, pretty_print = True)
+    xml = etree.tostring(document, xml_declaration = True, encoding = 'UTF-8', pretty_print = True)
 
     tlv_data = bytearray()
     tlv_data += struct.pack('> B H B B', HEADER_VERSION, 2, 1, 0)
