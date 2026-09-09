@@ -16,7 +16,6 @@ import traceback
 
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat import backends
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
 
@@ -283,7 +282,7 @@ def parse_tlv_file(tlv_file):
                 print(f'Certificate:      {len(certificate)} bytes')
 
                 try:
-                    certificate = x509.load_der_x509_certificate(certificate, backends.default_backend())
+                    certificate = x509.load_der_x509_certificate(certificate)
                 except ValueError:
                     raise ProgramError('Invalid certificate')
 
@@ -345,7 +344,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate)
     except ValueError:
         raise ProgramError(f'No certificate in file: {sast_certificate_file}')
 
@@ -355,7 +354,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
         raise ProgramError(f'No RSA public-key in file: {sast_certificate_file}')
 
     try:
-        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
+        private_key = serialization.load_pem_private_key(private_key, None)
     except ValueError:
         raise ProgramError(f'No private-key in file: {sast_certificate_file}')
 
@@ -415,7 +414,7 @@ def build_tlv_file(tlv_file, sast_certificate_file, version, hash_algorithm, fil
             raise ProgramError(f'{error.strerror}: {error.filename}')
 
         try:
-            certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+            certificate = x509.load_pem_x509_certificate(certificate)
         except ValueError:
             raise ProgramError(f'No certificate in file: {certificate_file}')
 

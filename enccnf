@@ -17,7 +17,6 @@ import traceback
 from lxml import etree
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat import backends
 from cryptography.hazmat.primitives import ciphers, hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
@@ -225,7 +224,7 @@ def parse_enc_file(enc_file, tftp_certificate_file):
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate)
     except ValueError:
         raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
 
@@ -251,7 +250,7 @@ def remove_enc_file(enc_file, private_key_file):
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        device_private_key = serialization.load_pem_private_key(device_private_key, None, backends.default_backend())
+        device_private_key = serialization.load_pem_private_key(device_private_key, None)
     except ValueError:
         raise ProgramError(f'No private-key in file: {private_key_file}')
 
@@ -353,13 +352,13 @@ def remove_enc_file(enc_file, private_key_file):
     except ValueError:
         raise ProgramError('Unable to decrypt encryption key')
 
-    cipher = ciphers.Cipher(algorithms.AES(encryption_key), modes.CBC(encryption_iv), backends.default_backend())
+    cipher = ciphers.Cipher(algorithms.AES(encryption_key), modes.CBC(encryption_iv))
     decryptor = cipher.decryptor()
 
     xml = decryptor.update(xml) + decryptor.finalize()
     xml = xml[:-encryption_padding]
 
-    hash = hashes.Hash(hashes.SHA512() if encryption_hash_algorithm == HASH_SHA512 else hashes.SHA1(), backends.default_backend())
+    hash = hashes.Hash(hashes.SHA512() if encryption_hash_algorithm == HASH_SHA512 else hashes.SHA1())
     hash.update(xml)
 
     xml_hash = hash.finalize()
@@ -396,7 +395,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate)
     except ValueError:
         raise ProgramError(f'No certificate in file: {tftp_certificate_file}')
 
@@ -406,7 +405,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
         raise ProgramError(f'No RSA public-key in file: {tftp_certificate_file}')
 
     try:
-        private_key = serialization.load_pem_private_key(private_key, None, backends.default_backend())
+        private_key = serialization.load_pem_private_key(private_key, None)
     except ValueError:
         raise ProgramError(f'No private-key in file: {tftp_certificate_file}')
 
@@ -423,7 +422,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        device_certificate = x509.load_pem_x509_certificate(device_certificate, backends.default_backend())
+        device_certificate = x509.load_pem_x509_certificate(device_certificate)
     except ValueError:
         raise ProgramError(f'No certificate in file: {certificate_file}')
 
@@ -485,7 +484,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     tlv_data += struct.pack('> B H', HEADER_FILENAME, len(filename)) + filename
     tlv_data += struct.pack('> B H I', HEADER_TIMESTAMP, 4, int(time.time()))
 
-    hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1(), backends.default_backend())
+    hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1())
     hash.update(xml)
 
     encryption_hash = hash.finalize()
@@ -497,7 +496,7 @@ def build_enc_file(cnf_file, tftp_certificate_file, certificate_file, hash_algor
     encryption_padding = len(encryption_key) - (len(xml) % len(encryption_key))
     xml += encryption_padding * b'\r'
 
-    cipher = ciphers.Cipher(algorithms.AES(encryption_key), modes.CBC(encryption_iv), backends.default_backend())
+    cipher = ciphers.Cipher(algorithms.AES(encryption_key), modes.CBC(encryption_iv))
     encryptor = cipher.encryptor()
 
     xml = encryptor.update(xml) + encryptor.finalize()

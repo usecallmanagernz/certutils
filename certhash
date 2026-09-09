@@ -12,7 +12,6 @@ import getopt
 import traceback
 
 from cryptography import x509
-from cryptography.hazmat import backends
 from cryptography.hazmat.primitives import hashes, serialization
 
 
@@ -29,11 +28,11 @@ def hash_certificate(certificate_file, hash_algorithm):
         raise ProgramError(f'{error.strerror}: {error.filename}')
 
     try:
-        certificate = x509.load_pem_x509_certificate(certificate, backends.default_backend())
+        certificate = x509.load_pem_x509_certificate(certificate)
     except ValueError:
         raise ProgramError(f'No certificate in file: {certificate_file}')
 
-    hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1(), backends.default_backend())
+    hash = hashes.Hash(hashes.SHA512() if hash_algorithm == 'sha512' else hashes.SHA1())
     hash.update(certificate.public_bytes(serialization.Encoding.DER))
 
     certificate_hash = hash.finalize()
